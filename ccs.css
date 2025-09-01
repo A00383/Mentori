@@ -6,7 +6,9 @@ width:18%; height:50%;
 border: 2px solid black;
     margin: 0 auto 0 auto;
 }
-.contenedor{
+
+
+#celula{
     display: grid;
     grid-template-columns: 1fr;
     grid-template-rows: 1fr;
@@ -16,10 +18,15 @@ place-items: center;
     grid-row: 1 / 1;
     grid-column: 1 / 1;
     position: absolute;
-
+}
 #ciplasma {
     grid-row: 1 / 1;
     grid-column: 1 / 1;
     position: relative;
     object-fit: none;
-}}
+}
+.organelos:hover {
+    background-color: lightblue;
+    color: black;
+}
+

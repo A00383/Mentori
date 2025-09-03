@@ -24,13 +24,13 @@ body {
     margin: auto;
     width: fit-content;
 }
-
+.organelos{
+    fill: transparent; opacity: 1; fill-opacity: 1; stroke: #000000; fill-rule: evenodd;
+}
 
 /* Efecto hover */
-svg path:hover,
-svg circle:hover,
-svg rect:hover {
+.organelos:hover{
     stroke: black;
-    fill: #006284;
+    fill: blue;
     stroke-width: 3;
 }

@@ -1,4 +1,4 @@
-/* Reset */
+
 * {
     margin: 0;
     padding: 0;
@@ -18,24 +18,28 @@ body {
     margin: 20px auto;
     text-align: center;
 }
-
-#celula {
-    position: relative;
-    margin: auto;
-    width: fit-content;
-}
 .organelos{
     fill: transparent; opacity: 1; fill-opacity: 1; stroke: #000000; fill-rule: evenodd;
 }
-#celula-contenedor {
-    height: 100vh; /* full viewport height */
-    display: flex;
-    align-items: center;     /* vertical centering */
-    justify-content: center; /* horizontal centering */
-}
+
+
 /* Efecto hover */
 .organelos:hover{
     stroke: black;
     fill: blue;
     stroke-width: 3;
+}
+
+#celula {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 75vh; /* Optional: fills the screen vertically */
+}
+
+#celulasvg {
+    width: 50%;  /* Scale down size, adjust as needed */
+    height: auto;
+    max-height: 406px;
+    max-width: 350px; /* Optional: limits size */
 }

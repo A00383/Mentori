@@ -43,3 +43,52 @@ body {
     max-height: 406px;
     max-width: 350px; /* Optional: limits size */
 }
+
+
+
+#pop-up{
+    position: fixed; /* stays in place while scrolling */
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0,0,0,0.4); /* semi-transparent overlay */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    visibility: visible; /* hidden by default */
+    opacity: 1;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    z-index: 1000; /* sits above your svg */
+}
+
+#pop-up-content {
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+
+    /* Size control */
+    width: 75vw;   /* takes up to 75% of viewport width */
+    height: 75vh;  /* takes up to 75% of viewport height */
+    max-width: 900px;  /* optional: cap size on big screens */
+    max-height: 700px; /* optional */
+
+    /* Grid */
+    display: grid;
+    grid-template-columns: 1fr 3fr;
+    grid-template-rows: repeat(2, 1fr);
+    grid-column-gap: 15px;
+    grid-row-gap: 10px;
+
+    overflow: auto;   /* scrolls if content is too big */
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+}
+
+#colse-pop-up{
+    display: flex;          /* make the cell a flex container */
+    justify-content: flex-start; /* push to right */
+    align-items: flex-start;   /* push to top */
+    width: 10%;
+    aspect-ratio: 1 / 1;
+
+}

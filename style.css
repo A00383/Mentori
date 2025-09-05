@@ -99,3 +99,9 @@ body {
     aspect-ratio: 1 / 1;
 }
 
+#colse-pop-up.active{
+    #pop-up{
+        visibility: hidden;
+        opacity: 0;
+    }
+}

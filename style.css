@@ -56,11 +56,16 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    visibility: visible; /* hidden by default */
-    opacity: 1;
+    visibility: hidden; /* hidden by default */
+    opacity: 0;
     transition: opacity 0.3s ease, visibility 0.3s ease;
     z-index: 1000; /* sits above your svg */
 }
+#pop-up.active{
+    visibility: visible;
+    opacity: 1;
+}
+
 
 #pop-up-content {
     background: #fff;
@@ -92,5 +97,5 @@ body {
     width: 5%;
     justify-self: end;
     aspect-ratio: 1 / 1;
-
 }
+

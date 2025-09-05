@@ -11,3 +11,9 @@ document.querySelectorAll('.organelos').forEach(organelos => {
 closepopup.addEventListener("click", () => {
     popup.classList.remove("active");
 });
+
+popup.addEventListener('click', (e) => {
+    if (e.target === popup) { // only if clicking on overlay, not children
+        popup.classList.remove('active');
+    }
+});

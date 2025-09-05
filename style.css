@@ -98,10 +98,3 @@ body {
     justify-self: end;
     aspect-ratio: 1 / 1;
 }
-
-#close-pop-up.active{
-    #pop-up{
-        visibility: hidden;
-        opacity: 0;
-    }
-}

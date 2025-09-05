@@ -76,19 +76,21 @@ body {
     /* Grid */
     display: grid;
     grid-template-columns: 1fr 3fr;
-    grid-template-rows: repeat(2, 1fr);
-    grid-column-gap: 15px;
-    grid-row-gap: 10px;
+    grid-template-rows: 1fr repeat(2, 5fr);
+    grid-column-gap: 0;
+    grid-row-gap: 0;
 
     overflow: auto;   /* scrolls if content is too big */
     box-shadow: 0 4px 20px rgba(0,0,0,0.25);
 }
 
 #colse-pop-up{
-    display: flex;          /* make the cell a flex container */
-    justify-content: flex-start; /* push to right */
-    align-items: flex-start;   /* push to top */
-    width: 10%;
+    grid-row-start: 1;
+    grid-row-end: 1;
+    grid-column-start: 2;
+    grid-column-end: 2;
+    width: 5%;
+    justify-self: end;
     aspect-ratio: 1 / 1;
 
 }

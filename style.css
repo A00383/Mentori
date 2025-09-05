@@ -89,7 +89,7 @@ body {
     box-shadow: 0 4px 20px rgba(0,0,0,0.25);
 }
 
-#colse-pop-up{
+#close-pop-up{
     grid-row-start: 1;
     grid-row-end: 1;
     grid-column-start: 2;
@@ -99,7 +99,7 @@ body {
     aspect-ratio: 1 / 1;
 }
 
-#colse-pop-up.active{
+#close-pop-up.active{
     #pop-up{
         visibility: hidden;
         opacity: 0;

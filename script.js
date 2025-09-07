@@ -19,6 +19,7 @@ popup.addEventListener('click', (e) => {
 });
 const popupname = document.getElementById('pop-up-name');
 const mainorganelname = document.getElementById('organelo');
+
 const membranacelular = document.getElementById ('membrana celular');
 const citoplasma = document.getElementById ('citoplasma');
 const nucleolo = document.getElementById ('nucleolo');

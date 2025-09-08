@@ -3,6 +3,7 @@ const closepopup = document.getElementById('close-pop-up');
 const savepopup = document.getElementById('save-pop-up');
 const organelos = document.querySelectorAll('.organelos');
 const popupmessage = document.getElementById('pop-up-message');
+const popupcontentcomponents = document.getElementsByClassName('pop-up-contentcomponents');
 
 let currentogranel = null;
 organelos.forEach(selectedorganel => {
@@ -30,13 +31,16 @@ closepopup.addEventListener("click", () => {
 
 popup.addEventListener('click', (e) => {
     if (e.target === popup) { // only if clicking on overlay, not children
+        if (currentogranel) {
+            currentogranel.dataset.content = popupmessage.value;
+            console.log("Saved to div (on outside click):", currentogranel, "Content:", popupmessage.value);
+        }
         popup.classList.remove('active');
     }
-    if (currentogranel) {
-        currentogranel.dataset.content = popupmessage.value;
-        console.log(("Saved to div:", currentogranel, "Content:", popupmessage.value));
-    }
 });
+
+
+
 const popupname = document.getElementById('pop-up-name');
 const mainorganelname = document.getElementById('organelo');
 

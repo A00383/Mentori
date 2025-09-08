@@ -1,10 +1,12 @@
 const popup = document.getElementById('pop-up');
 const closepopup = document.getElementById('close-pop-up');
+const organelos = document.querySelectorAll('.organelos');
+const popupmessage = document.getElementById('pop-up-message');
 
-document.querySelectorAll('.organelos').forEach(organelos => {
+organelos.forEach(organelos => {
     organelos.addEventListener('click', () => {
-
         popup.classList.add('active');
+        popupmessage.textContent = organelos.dataset.content;
     })
 })
 

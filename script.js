@@ -1,15 +1,29 @@
 const popup = document.getElementById('pop-up');
 const closepopup = document.getElementById('close-pop-up');
+const savepopup = document.getElementById('save-pop-up');
 const organelos = document.querySelectorAll('.organelos');
 const popupmessage = document.getElementById('pop-up-message');
+
+let currentogranel = null;
+organelos.forEach(selectedorganel => {
+    selectedorganel.addEventListener('click', () => {
+        currentogranel = selectedorganel;
+        popupmessage.value = selectedorganel.dataset.content;
+    })
+})
 
 organelos.forEach(organelos => {
     organelos.addEventListener('click', () => {
         popup.classList.add('active');
-        popupmessage.textContent = organelos.dataset.content;
     })
 })
 
+savepopup.addEventListener('click', () => {
+    if (currentogranel) {
+        currentogranel.dataset.content = popupmessage.value;
+        console.log(("Saved to div:", currentogranel, "Content:", popupmessage.value));
+    }
+})
 closepopup.addEventListener("click", () => {
     popup.classList.remove("active");
 });

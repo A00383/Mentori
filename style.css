@@ -134,6 +134,7 @@ body {
 }
 
 #pop-up-message {
+    resize: none;
     grid-area: 2 / 2 / 4 / 3;
     display: flex;
     align-self: start;   /* stick to top of grid cell */
@@ -143,8 +144,8 @@ body {
     font-size: 1.2rem;
 }
 
-
 #description {
+    resize: none;
     grid-row: 2; grid-column: 3;
     display: flex;
     align-self: start;   /* stick to top of grid cell */

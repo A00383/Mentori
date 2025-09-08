@@ -88,18 +88,13 @@ body {
     background: #fff;
     padding: 20px;
     border-radius: 12px;
-
-    /* Size control */
     width: 75vw;   /* takes up to 75% of viewport width */
     height: 75vh;  /* takes up to 75% of viewport height */
-    max-width: 900px;  /* optional: cap size on big screens */
-    max-height: 700px; /* optional */
-
-    /* Grid */
+    aspect-ratio: 9/7;
     display: grid;
-    grid-template-columns: 1fr 3fr;
+    grid-template-columns: 5fr 12fr;
     grid-template-rows: 1fr repeat(2, 5fr);
-    grid-column-gap: 0;
+    grid-column-gap: 1%;
     grid-row-gap: 0;
 
     overflow: auto;   /* scrolls if content is too big */

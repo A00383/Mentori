@@ -32,6 +32,10 @@ popup.addEventListener('click', (e) => {
     if (e.target === popup) { // only if clicking on overlay, not children
         popup.classList.remove('active');
     }
+    if (currentogranel) {
+        currentogranel.dataset.content = popupmessage.value;
+        console.log(("Saved to div:", currentogranel, "Content:", popupmessage.value));
+    }
 });
 const popupname = document.getElementById('pop-up-name');
 const mainorganelname = document.getElementById('organelo');

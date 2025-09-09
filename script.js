@@ -3,7 +3,6 @@ const closepopup = document.getElementById('close-pop-up');
 const savepopup = document.getElementById('save-pop-up');
 const organelos = document.querySelectorAll('.organelos');
 const popupmessage = document.getElementById('pop-up-message');
-const popupcontentcomponents = document.getElementsByClassName('pop-up-contentcomponents');
 
 let currentogranel = null;
 organelos.forEach(selectedorganel => {
@@ -39,6 +38,36 @@ popup.addEventListener('click', (e) => {
     }
 });
 
+const mainimageinput = document.getElementById('main-image-input');
+let mainimagecurrent = document.getElementById('main-image-placeholder');
+
+function makeClickable(el) {
+    el.style.cursor = "pointer";
+    el.addEventListener("click", () => mainimageinput.click());
+}
+makeClickable(mainimagecurrent);
+
+mainimageinput.addEventListener("change", (event) => {
+    const currentfile = event.target.files[0];
+    if (!currentfile) return;
+
+    const mainimagereader = new FileReader();
+    mainimagereader.onload = (e) => {
+        if (mainimagecurrent.tagName.toLowerCase() !== "img") {
+            const nowmainimage = document.createElement("img");
+            nowmainimage.classList.add("main-image");
+
+            // Replace SVG with <img>
+            mainimagecurrent.replaceWith(nowmainimage);
+            mainimagecurrent = nowmainimage;
+            makeClickable(mainimagecurrent);
+        }
+
+        mainimagecurrent.src = e.target.result;
+    };
+
+    mainimagereader.readAsDataURL(currentfile);
+});
 
 
 const popupname = document.getElementById('pop-up-name');

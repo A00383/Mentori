@@ -18,6 +18,32 @@ body {
     height: 100vh;
 }
 
+#main-image-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 99%;
+    height: 99%;
+    grid-row: 2; grid-column: 1;
+}
+
+#main-image-input {
+display: none;
+}
+
+#main-image-placeholder{
+    fill: #000000;
+    aspect-ratio: 1/1;
+    width: 80%;
+}
+
+.main-image {
+    max-height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+}
+
+
 #organelo {
     grid-row: 1; grid-column: 2;
     display: flex;

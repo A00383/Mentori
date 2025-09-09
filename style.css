@@ -20,7 +20,7 @@ body {
 
 #main-image-container {
     display: flex;
-    justify-content: end;
+    justify-content: center;
     align-items: center;
     width: 99%;
     height: 99%;

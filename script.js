@@ -38,36 +38,65 @@ popup.addEventListener('click', (e) => {
     }
 });
 
-const mainimageinput = document.getElementById('main-image-input');
-let mainimagecurrent = document.getElementById('main-image-placeholder');
+const input = document.getElementById("main-image-input");
+const addBtn = document.getElementById("main-image-add");
+const removeBtn = document.getElementById("main-image-remove");
+const imagesContainer = document.getElementById("main-image-images");
 
-function makeClickable(el) {
-    el.style.cursor = "pointer";
-    el.addEventListener("click", () => mainimageinput.click());
-}
-makeClickable(mainimagecurrent);
+let removeMode = false;
 
-mainimageinput.addEventListener("change", (event) => {
-    const currentfile = event.target.files[0];
-    if (!currentfile) return;
-
-    const mainimagereader = new FileReader();
-    mainimagereader.onload = (e) => {
-        if (mainimagecurrent.tagName.toLowerCase() !== "img") {
-            const nowmainimage = document.createElement("img");
-            nowmainimage.classList.add("main-image");
-
-            // Replace SVG with <img>
-            mainimagecurrent.replaceWith(nowmainimage);
-            mainimagecurrent = nowmainimage;
-            makeClickable(mainimagecurrent);
-        }
-
-        mainimagecurrent.src = e.target.result;
-    };
-
-    mainimagereader.readAsDataURL(currentfile);
+// Trigger file input when "Add image" is clicked
+addBtn.addEventListener("click", () => {
+    input.click();
 });
+
+// When a file is chosen, add it as an <img>
+input.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const img = document.createElement("img");
+        const base64 = event.target.result; // text form of image
+
+        img.src = base64;
+        img.classList.add("main-image");
+
+        // 🔹 Store the image text inside dataset
+        img.dataset.src = base64;
+
+        // Only removable when in remove mode
+        img.addEventListener("click", () => {
+            if (removeMode) {
+                imagesContainer.removeChild(img);
+            }
+        });
+
+        imagesContainer.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+
+    // reset input so the same file can be uploaded again if needed
+    input.value = "";
+});
+
+// Toggle remove mode
+removeBtn.addEventListener("click", () => {
+    removeMode = !removeMode;
+    const imgs = document.querySelectorAll(".main-image");
+
+    imgs.forEach(img => {
+        if (removeMode) {
+            img.classList.add("removable");
+        } else {
+            img.classList.remove("removable");
+        }
+    });
+
+    removeBtn.textContent = removeMode ? "Cancelar quitar" : "Quitar imagen";
+});
+
 
 
 const popupname = document.getElementById('pop-up-name');

@@ -1,4 +1,3 @@
-
 * {
     margin: 0;
     padding: 0;
@@ -44,9 +43,11 @@ display: none;
 }
 
 #main-image-add {
-width: 49%;
+    background-color: #add8e6;
+    width: 49%;
 }
 #main-image-remove {
+    background-color: red;
     width: 49%;
 }
 
@@ -159,7 +160,7 @@ width: 49%;
     aspect-ratio: 9/7;
     display: grid;
     grid-template-columns: 5fr 12fr;
-    grid-template-rows: 1fr repeat(2, 5fr);
+    grid-template-rows: 1fr 10fr;
     grid-column-gap: 1%;
     grid-row-gap: 0;
 
@@ -170,18 +171,19 @@ width: 49%;
 #close-pop-up{
     grid-row: 1;
     grid-column: 2;
-    width: 5%;
+    height: 75%;
     justify-self: end;
-    aspect-ratio: 1 / 1;
-
+    padding: 1% 1% 1% 1%;
+    background-color: red;
 }
 
 #save-pop-up{
     grid-row: 1;
     grid-column: 1;
-    width: 15%;
+    height: 75%;
     justify-self: start;
-    aspect-ratio: 1 / 1;
+    padding: 1% 1% 1% 1%;
+    background-color: #add8e6;
 }
 
 #pop-up-name {
@@ -196,13 +198,49 @@ width: 49%;
 
 #pop-up-message {
     resize: none;
-    grid-area: 2 / 2 / 4 / 3;
+    grid-area: 2 / 2 / 3 / 3;
     display: flex;
     align-self: start;   /* stick to top of grid cell */
     justify-self: start;
     width: 100%;
     height: 100%;
     font-size: 1.2rem;
+}
+
+#pop-up-image-section {
+    grid-column: 1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 11fr;
+}
+
+.pop-up-image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    /* optional, comment out if you want full-size images inside the scroller */
+    object-fit: contain;
+}
+
+#pop-up-image-section-buttons {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+#pop-up-image-add{
+    background-color: #add8e6;
+    width: 49%;
+}
+
+#pop-up-image-remove{
+    background-color: red;
+    width: 49%;
+}
+
+#pop-up-image-file {
+    display: none;
 }
 
 #description {

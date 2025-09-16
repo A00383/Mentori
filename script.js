@@ -3,14 +3,37 @@ const closepopup = document.getElementById('close-pop-up');
 const savepopup = document.getElementById('save-pop-up');
 const organelos = document.querySelectorAll('.organelos');
 const popupmessage = document.getElementById('pop-up-message');
+const popupimageinput = document.getElementById("pop-up-image-file");
+const popupimageadd = document.getElementById("pop-up-image-add");
+const popupimageremove = document.getElementById("pop-up-image-remove");
+const popupimagecontainer = document.getElementById("pop-up-image-section-images");
 
 let currentogranel = null;
+let popupimageremovemode= false
+
+
 organelos.forEach(selectedorganel => {
     selectedorganel.addEventListener('click', () => {
         currentogranel = selectedorganel;
         popupmessage.value = selectedorganel.dataset.content;
-    })
-})
+        popupimagecontainer.innerHTML = ""; // clear previous
+        if (selectedorganel.dataset.image) {
+            const imgs = JSON.parse(selectedorganel.dataset.image); // array of base64 strings
+            imgs.forEach(src => {
+                const popupimg = document.createElement("img");
+                popupimg.src = src;
+                popupimg.classList.add("pop-up-image");
+
+                popupimg.addEventListener("click", () => {
+                    if (popupimageremovemode) {
+                        popupimagecontainer.removeChild(popupimg);
+                    }
+                });
+                popupimagecontainer.appendChild(popupimg);
+            });
+        }
+    });
+});
 
 organelos.forEach(organelos => {
     organelos.addEventListener('click', () => {
@@ -18,12 +41,64 @@ organelos.forEach(organelos => {
     })
 })
 
+popupimageadd.addEventListener("click", () => {
+    popupimageinput.click();
+});
+
+popupimageinput.addEventListener("change", (e) => {
+    const popupfile = e.target.files[0];
+    if (!popupfile) return;
+
+    const popupreader = new FileReader();
+    popupreader.onload = function(event) {
+        const popupimg = document.createElement("img");
+        const base64 = event.target.result;
+
+        popupimg.src = base64;
+        popupimg.classList.add("pop-up-image");
+
+        popupimg.dataset.image = popupimg.src;
+
+        popupimg.addEventListener("click", () => {
+            if (popupimageremovemode) {
+                popupimagecontainer.removeChild(popupimg);
+            }
+        });
+        popupimagecontainer.appendChild(popupimg);
+    }
+    popupreader.readAsDataURL(popupfile);
+
+    popupimageinput.value = "";
+});
+popupimageremove.addEventListener("click", () => {
+    popupimageremovemode = !popupimageremovemode;
+    const popupimgs  = document.querySelectorAll(".pop-up-image");
+
+    popupimgs.forEach(img => {
+        if (mainimageremoveMode) {
+            img.classList.add("removable");
+        } else {
+            img.classList.remove("removable");
+        }
+    });
+
+    popupimageremove.textContent = popupimageremovemode ? "Cancelar quitar" : "Quitar imagen";
+});
+
 savepopup.addEventListener('click', () => {
     if (currentogranel) {
         currentogranel.dataset.content = popupmessage.value;
         console.log(("Saved to div:", currentogranel, "Content:", popupmessage.value));
+        const imgs = [...popupimagecontainer.querySelectorAll("img")].map(img => img.src);
+        currentogranel.dataset.image = JSON.stringify(imgs);
+
+        console.log("Saved:", currentogranel, {
+            content: currentogranel.dataset.content,
+            images: currentogranel.dataset.image
+        });
     }
-})
+});
+
 closepopup.addEventListener("click", () => {
     popup.classList.remove("active");
 });
@@ -31,72 +106,89 @@ closepopup.addEventListener("click", () => {
 popup.addEventListener('click', (e) => {
     if (e.target === popup) { // only if clicking on overlay, not children
         if (currentogranel) {
+            // Save text
             currentogranel.dataset.content = popupmessage.value;
-            console.log("Saved to div (on outside click):", currentogranel, "Content:", popupmessage.value);
+
+            // Save images (array or single)
+            const imgs = [...popupimagecontainer.querySelectorAll("img")].map(img => img.src);
+            currentogranel.dataset.image = JSON.stringify(imgs);
+
+            console.log("Saved to div (on outside click):", currentogranel, {
+                content: currentogranel.dataset.content,
+                images: currentogranel.dataset.image
+            });
         }
+
+        // Close popup
         popup.classList.remove('active');
     }
 });
 
-const input = document.getElementById("main-image-input");
-const addBtn = document.getElementById("main-image-add");
-const removeBtn = document.getElementById("main-image-remove");
-const imagesContainer = document.getElementById("main-image-images");
 
-let removeMode = false;
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//main page image//////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+const mainimageinput = document.getElementById("main-image-input");
+const mainaddBtn = document.getElementById("main-image-add");
+const mainremoveBtn = document.getElementById("main-image-remove");
+const mainimagesContainer = document.getElementById("main-image-images");
+
+let mainimageremoveMode = false;
 
 // Trigger file input when "Add image" is clicked
-addBtn.addEventListener("click", () => {
-    input.click();
+mainaddBtn.addEventListener("click", () => {
+    mainimageinput.click();
 });
 
 // When a file is chosen, add it as an <img>
-input.addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+mainimageinput.addEventListener("change", (e) => {
+    const mainimagefile = e.target.files[0];
+    if (!mainimagefile) return;
 
-    const reader = new FileReader();
-    reader.onload = function(event) {
-        const img = document.createElement("img");
+    const mainimagereader = new FileReader();
+    mainimagereader.onload = function(event) {
+        const mainimg = document.createElement("img");
         const base64 = event.target.result; // text form of image
 
-        img.src = base64;
-        img.classList.add("main-image");
+        mainimg.src = base64;
+        mainimg.classList.add("main-image");
 
         // 🔹 Store the image text inside dataset
-        img.dataset.src = base64;
+        mainimg.dataset.src = base64;
 
         // Only removable when in remove mode
-        img.addEventListener("click", () => {
-            if (removeMode) {
-                imagesContainer.removeChild(img);
+        mainimg.addEventListener("click", () => {
+            if (mainimageremoveMode) {
+                mainimagesContainer.removeChild(mainimg);
             }
         });
 
-        imagesContainer.appendChild(img);
+        mainimagesContainer.appendChild(mainimg);
     };
-    reader.readAsDataURL(file);
+    mainimagereader.readAsDataURL(mainimagefile);
 
     // reset input so the same file can be uploaded again if needed
-    input.value = "";
+    mainimageinput.value = "";
 });
 
 // Toggle remove mode
-removeBtn.addEventListener("click", () => {
-    removeMode = !removeMode;
+mainremoveBtn.addEventListener("click", () => {
+    mainimageremoveMode = !mainimageremoveMode;
     const imgs = document.querySelectorAll(".main-image");
 
     imgs.forEach(img => {
-        if (removeMode) {
+        if (mainimageremoveMode) {
             img.classList.add("removable");
         } else {
             img.classList.remove("removable");
         }
     });
 
-    removeBtn.textContent = removeMode ? "Cancelar quitar" : "Quitar imagen";
+    mainremoveBtn.textContent = mainimageremoveMode ? "Cancelar quitar" : "Quitar imagen";
 });
-
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//pop up image input///////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 const popupname = document.getElementById('pop-up-name');

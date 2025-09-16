@@ -25,7 +25,7 @@ body {
     flex-direction: row;
     justify-content: center;
     align-items: start;
-    min-height: 0;        /* <---- critical for scrollable child */
+    min-height: 0;
     overflow: hidden;
     width: 99%;
     height: 99%;
@@ -60,7 +60,7 @@ display: none;
     padding: 10px;
     width: 100%;
     height: 100%;
-    min-height: 0;          /* <---- also critical */
+    min-height: 0;
     box-sizing: border-box;
     overflow-y: auto;
     overflow-x: hidden;
@@ -71,7 +71,6 @@ display: none;
     display: block;
     max-width: 100%;
     height: auto;
-    /* optional, comment out if you want full-size images inside the scroller */
     object-fit: contain;
 }
 
@@ -105,8 +104,6 @@ display: none;
     fill: transparent; opacity: 1; fill-opacity: 1; stroke: #000000; fill-rule: evenodd;
 }
 
-
-/* Efecto hover */
 .organelos:hover{
     stroke: black;
     fill: blue;
@@ -118,11 +115,11 @@ display: none;
     display: flex;
     justify-content: center;
     align-items: center;
-    max-width: 100%; /* Optional: fills the screen vertically */
+    max-width: 100%;
 }
 
 #celulasvg {
-    width: 100%;  /* Scale down size, adjust as needed */
+    width: 100%;
     height: 100%;
     aspect-ratio: 350 / 406
 }
@@ -130,12 +127,12 @@ display: none;
 
 
 #pop-up{
-    position: fixed; /* stays in place while scrolling */
+    position: fixed;
     top: 0;
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(0,0,0,0.4); /* semi-transparent overlay */
+    background: rgba(0,0,0,0.4);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -143,7 +140,7 @@ display: none;
 ; /* hidden by default */
     opacity: 0;
     transition: opacity 0.3s ease, visibility 0.3s ease;
-    z-index: 1000; /* sits above your svg */
+    z-index: 1000;
 }
 #pop-up.active{
     visibility: visible;
@@ -155,8 +152,8 @@ display: none;
     background: #fff;
     padding: 20px;
     border-radius: 12px;
-    width: 75vw;   /* takes up to 75% of viewport width */
-    height: 75vh;  /* takes up to 75% of viewport height */
+    width: 75vw;
+    height: 75vh;
     aspect-ratio: 9/7;
     display: grid;
     grid-template-columns: 5fr 12fr;
@@ -164,7 +161,7 @@ display: none;
     grid-column-gap: 1%;
     grid-row-gap: 0;
 
-    overflow: auto;   /* scrolls if content is too big */
+    overflow: auto;
     box-shadow: 0 4px 20px rgba(0,0,0,0.25);
 }
 
@@ -213,14 +210,13 @@ display: none;
     display: grid;
     grid-template-columns: 1fr;
     grid-template-rows: 1fr 11fr;
-    min-height: 0;   /* ✅ critical so row 2 can shrink and scroll */
+    min-height: 0;
 }
 
 .pop-up-image {
     display: block;
     max-width: 100%;
     height: auto;
-    /* optional, comment out if you want full-size images inside the scroller */
     object-fit: contain;
 }
 
@@ -239,9 +235,9 @@ display: none;
     padding: 10px;
     width: 100%;
     height: 100%;
-    min-height: 0;          /* ✅ lets it shrink inside the grid */
+    min-height: 0;
     box-sizing: border-box;
-    overflow-y: auto;       /* ✅ vertical scroll inside this grid area */
+    overflow-y: auto;
     overflow-x: hidden;
 }
 
@@ -263,7 +259,7 @@ display: none;
     resize: none;
     grid-row: 2; grid-column: 3;
     display: flex;
-    align-self: start;   /* stick to top of grid cell */
+    align-self: start;
     justify-self: start;
     width: 99%;
     height: 99%;

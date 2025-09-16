@@ -213,6 +213,7 @@ display: none;
     display: grid;
     grid-template-columns: 1fr;
     grid-template-rows: 1fr 11fr;
+    min-height: 0;   /* ✅ critical so row 2 can shrink and scroll */
 }
 
 .pop-up-image {
@@ -227,6 +228,21 @@ display: none;
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
+}
+
+#pop-up-image-section-images {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 10px;
+    width: 100%;
+    height: 100%;
+    min-height: 0;          /* ✅ lets it shrink inside the grid */
+    box-sizing: border-box;
+    overflow-y: auto;       /* ✅ vertical scroll inside this grid area */
+    overflow-x: hidden;
 }
 
 #pop-up-image-add{

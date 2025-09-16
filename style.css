@@ -18,6 +18,34 @@ body {
     overflow: hidden;
 }
 
+#rightui {
+    grid-row: 1; grid-column-start: 3;
+    width: 100%;
+    height: 100%;
+}
+
+#savebtn {
+    background-color: blue;
+    aspect-ratio: 1/1;
+    height: 50%;
+}
+
+#leftui {
+    grid-row: 1; grid-column-start: 1;
+    width: 100%;
+    height: 100%;
+}
+
+#loadbtn{
+    background-color: green;
+    aspect-ratio: 1/1;
+    height: 50%;
+}
+
+#mainload {
+    display: none;
+}
+
 #main-image-container {
     display: grid;
     grid-template-columns: 1fr;

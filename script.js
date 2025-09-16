@@ -124,10 +124,6 @@ popup.addEventListener('click', (e) => {
     }
 });
 
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//main page image//////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 const mainimageinput = document.getElementById("main-image-input");
 const mainaddBtn = document.getElementById("main-image-add");
 const mainremoveBtn = document.getElementById("main-image-remove");
@@ -186,10 +182,105 @@ mainremoveBtn.addEventListener("click", () => {
 
     mainremoveBtn.textContent = mainimageremoveMode ? "Cancelar quitar" : "Quitar imagen";
 });
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//pop up image input///////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const savebtn = document.getElementById("savebtn");
+
+
+savebtn.addEventListener("click", () => {
+    const savedataexport = {
+        description: document.getElementById("description").value || "",
+        mainImages: [...mainimagesContainer.querySelectorAll("img")].map(img => img.src),
+        organelos: []
+    };
+
+    organelos.forEach((organelo) => {
+        savedataexport.organelos.push({
+            id: organelo.id || null,
+            content: organelo.dataset.content || "",
+            image: organelo.dataset.image ? JSON.parse(organelo.dataset.image) : [],
+        });
+    });
+
+    // Convert to JSON text
+    const blob = new Blob([JSON.stringify(savedataexport, null, 2)], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "datasets.txt";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+});
+
+const loadInput = document.getElementById("mainload");
+const loadBtn = document.getElementById("loadbtn");
+
+loadBtn.addEventListener("click", () => {
+    loadInput.click(); // trigger file selector
+});
+
+loadInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            const data = JSON.parse(event.target.result);
+
+            // 🔹 Restore description
+            document.getElementById("description").value = data.description || "";
+
+            // 🔹 Restore main images
+            mainimagesContainer.innerHTML = "";
+            if (data.mainImages) {
+                data.mainImages.forEach(src => {
+                    const mainimg = document.createElement("img");
+                    mainimg.src = src;
+                    mainimg.classList.add("main-image");
+
+                    mainimg.dataset.src = src;
+
+                    mainimg.addEventListener("click", () => {
+                        if (mainimageremoveMode) {
+                            mainimagesContainer.removeChild(mainimg);
+                        }
+                    });
+
+                    mainimagesContainer.appendChild(mainimg);
+                });
+            }
+
+            // 🔹 Restore organelos
+            if (data.organelos) {
+                data.organelos.forEach((item, index) => {
+                    let target = null;
+                    if (item.id) {
+                        target = document.getElementById(item.id);
+                    }
+                    if (!target && organelos[index]) {
+                        target = organelos[index];
+                    }
+
+                    if (target) {
+                        target.dataset.content = item.content || "";
+                        target.dataset.image = JSON.stringify(item.image || []);
+                    }
+                });
+            }
+
+            alert("Datasets loaded successfully!");
+        } catch (err) {
+            console.error("Invalid file format", err);
+            alert("Error: file is not valid JSON text.");
+        }
+    };
+    reader.readAsText(file);
+
+    loadInput.value = ""; // reset input
+});
 
 const popupname = document.getElementById('pop-up-name');
 const mainorganelname = document.getElementById('organelo');

@@ -13,13 +13,22 @@
     Célula animal
 </h1>
 
+<div id="leftui">
+    <button id="loadbtn"> </button>
+    <input id="mainload" type="file" accept=".txt">
+</div>
+
+<div id="rightui">
+    <button id="savebtn"></button>
+</div>
+
 <div id="main-image-container">
     <div id="main-image-buttons">
         <input type="file" id="main-image-input" accept="image/svg+xml, image/jpeg, image/gif, image/png">
         <button id="main-image-add">Añadir imagen</button>
         <button id="main-image-remove">Quitar imagen</button>
     </div>
-    <div id="main-image-images"></div>
+    <div id="main-image-images" data-mainimages=""></div>
 </div>
 
 <div id="celula">
@@ -104,7 +113,7 @@
     </div>
 </div>
 
-<textarea id="description" placeholder="" > </textarea>
+<textarea id="description" placeholder="" data-maintext=""> </textarea>
 
 </body>
 </html>

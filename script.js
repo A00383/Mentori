@@ -136,7 +136,6 @@ mainaddBtn.addEventListener("click", () => {
     mainimageinput.click();
 });
 
-// When a file is chosen, add it as an <img>
 mainimageinput.addEventListener("change", (e) => {
     const mainimagefile = e.target.files[0];
     if (!mainimagefile) return;
@@ -163,11 +162,9 @@ mainimageinput.addEventListener("change", (e) => {
     };
     mainimagereader.readAsDataURL(mainimagefile);
 
-    // reset input so the same file can be uploaded again if needed
     mainimageinput.value = "";
 });
 
-// Toggle remove mode
 mainremoveBtn.addEventListener("click", () => {
     mainimageremoveMode = !mainimageremoveMode;
     const imgs = document.querySelectorAll(".main-image");
@@ -184,7 +181,6 @@ mainremoveBtn.addEventListener("click", () => {
 });
 
 const savebtn = document.getElementById("savebtn");
-
 
 savebtn.addEventListener("click", () => {
     const savedataexport = {

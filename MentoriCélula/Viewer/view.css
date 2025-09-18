@@ -1,0 +1,282 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: white;
+}
+
+#body {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: 17fr 83fr;
+    grid-column-gap: 0.5%;
+    grid-row-gap: 0.5%;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#rightui {
+    grid-row: 1; grid-column-start: 3;
+    width: 100%;
+    height: 100%;
+}
+
+#savebtn {
+    background-color: blue;
+    aspect-ratio: 1/1;
+    height: 50%;
+}
+
+#leftui {
+    grid-row: 1; grid-column-start: 1;
+    width: 100%;
+    height: 100%;
+}
+
+#loadbtn{
+    background-color: green;
+    aspect-ratio: 1/1;
+    height: 50%;
+}
+
+#mainload {
+    display: none;
+}
+
+#main-image-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    flex-direction: row;
+    justify-content: center;
+    align-items: start;
+    min-height: 0;
+    overflow: hidden;
+    width: 99%;
+    height: 99%;
+    grid-row: 2; grid-column: 1;
+}
+
+#main-image-input {
+    display: none;
+}
+
+#main-image-images {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 10px;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    box-sizing: border-box;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+
+.main-image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    object-fit: contain;
+}
+
+.main-image.removable {
+    cursor: pointer;
+}
+
+.main-image.removable:hover {
+    transform: scale(1.05);
+    outline: 2px solid red;
+}
+
+
+#organelo {
+    grid-row: 1; grid-column: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    text-align: center;
+    font-size: 2rem;
+    word-wrap: break-word;
+    color: black;
+    background-color: white;
+    width: 80%;
+    max-height: 80%;
+    padding: 1% 1% 1% 1%;
+    border: 2px solid black;
+    margin: 1% auto;}
+.organelos{
+    fill: transparent; opacity: 1; fill-opacity: 1; stroke: #000000; fill-rule: evenodd;
+}
+
+.organelos:hover{
+    stroke: black;
+    fill: blue;
+    stroke-width: 3;
+}
+
+#celula {
+    grid-row: 2; grid-column: 2;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    max-width: 100%;
+}
+
+#celulasvg {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: 350 / 406
+}
+
+
+
+#pop-up{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0,0,0,0.4);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    visibility: hidden
+; /* hidden by default */
+    opacity: 0;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    z-index: 1000;
+}
+#pop-up.active{
+    visibility: visible;
+    opacity: 1;
+}
+
+
+#pop-up-content {
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    width: 75vw;
+    height: 75vh;
+    aspect-ratio: 9/7;
+    display: grid;
+    grid-template-columns: 5fr 12fr;
+    grid-template-rows: 1fr 10fr;
+    grid-column-gap: 1%;
+    grid-row-gap: 0;
+
+    overflow: auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+}
+
+#close-pop-up{
+    display: none;
+    grid-row: 1;
+    grid-column: 2;
+    height: 75%;
+    justify-self: end;
+    padding: 1% 1% 1% 1%;
+    background-color: red;
+}
+
+#save-pop-up{
+    display: none;
+    grid-row: 1;
+    grid-column: 1;
+    height: 75%;
+    justify-self: start;
+    padding: 1% 1% 1% 1%;
+    background-color: #add8e6;
+}
+
+#pop-up-name {
+    grid-area: 1 / 1 / 2 / 3;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    font-size: 1.2rem;
+}
+
+#pop-up-message {
+    resize: none;
+    grid-area: 2 / 2 / 3 / 3;
+    display: flex;
+    align-self: start;   /* stick to top of grid cell */
+    justify-self: start;
+    width: 100%;
+    height: 100%;
+    font-size: 1.2rem;
+}
+
+#pop-up-image-section {
+    grid-column: 1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    min-height: 0;
+}
+
+.pop-up-image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    object-fit: contain;
+}
+
+#pop-up-image-section-buttons {
+    display: none;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+#pop-up-image-section-images {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 10px;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    box-sizing: border-box;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#pop-up-image-add{
+    background-color: #add8e6;
+    width: 49%;
+}
+
+#pop-up-image-remove{
+    background-color: red;
+    width: 49%;
+}
+
+#pop-up-image-file {
+    display: none;
+}
+
+#description {
+    resize: none;
+    grid-row: 2; grid-column: 3;
+    display: flex;
+    align-self: start;
+    justify-self: start;
+    width: 99%;
+    height: 99%;
+    font-size: 1.2rem;
+}

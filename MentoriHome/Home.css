@@ -1,0 +1,121 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+}
+
+#body {
+    background-color:#253754;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 8fr;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#extras {
+    grid-column: 1;
+    grid-row: 1;
+    display: grid;
+    grid-template-columns: 1fr 4fr 1fr;
+    grid-template-rows: 1fr;
+}
+
+#user {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: center;
+    align-content: space-evenly;
+}
+
+
+#documents-main {
+    background-color: white;
+    grid-column: 1;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow-y: auto;
+}
+
+#documents-main-create-section {
+    padding: 20px;
+    border-bottom: 1px solid #ccc;
+}
+
+#documents-main-create-section-general-name {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+#documents-main-create-section-create-celula {
+    width: 200px;
+    height: 120px;
+    background-color: #e0e0e0;
+    border-radius: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+#documents-main-create-section-create-celula:hover {
+    transform: scale(1.05);
+    background-color: #d0d0d0
+}
+
+#documents-main-projects-section {
+    padding: 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+#documents-main-projects-section-preferences {
+    margin-bottom: 15px;
+    font-size: 1.2rem;
+    color: #555;
+}
+
+#documents-main-projects-section-projects {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 20px;
+    overflow-y: auto;
+    padding-bottom: 40px;
+    align-content: space-evenly;
+}
+
+.project-card {
+    background: #fafafa;
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s;
+    display: flex;
+    flex-direction: column;
+    aspect-ratio: 1 / 1;
+    width: 100%;
+}
+
+.project-card:hover {
+    transform: scale(1.03);
+}
+
+.project-thumbnail {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    background: #ddd; /* fallback background if no image */
+}
+
+.project-title {
+    padding: 10px;
+    font-size: 16px;
+    font-weight: bold;
+}

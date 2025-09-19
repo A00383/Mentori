@@ -115,3 +115,41 @@ createBtn.addEventListener("click", async () => {
         window.location.href = `/editor.html?id=${encodeURIComponent(tempId)}&guest=true`;
     }
 });
+
+import { nanoid } from "https://cdn.jsdelivr.net/npm/nanoid/nanoid.js";
+
+const createBtn = document.getElementById("documents-main-create-section-create-celula");
+
+createBtn.addEventListener("click", async () => {
+    const { data, error } = await supabase.auth.getSession();
+    const user = data.session?.user;
+
+    // Always generate an ID, whether user is logged in or not
+    const newId = nanoid();
+
+    if (user) {
+        // Logged in → create document in Supabase with generated id
+        const { data: doc, error: insertError } = await supabase
+            .from("documents")
+            .insert([
+                {
+                    id: newId,
+                    creator: user.email,
+                    content: "", // start empty
+                },
+            ])
+            .select()
+            .single();
+
+        if (insertError) {
+            console.error("Error creating document:", insertError);
+            return;
+        }
+
+        // Redirect to editor with real DB id
+        window.location.href = `/editor.html?id=${encodeURIComponent(doc.id)}`;
+    } else {
+        // Guest → skip DB, still use generated id
+        window.location.href = `/editor.html?id=${encodeURIComponent(newId)}&guest=true`;
+    }
+});

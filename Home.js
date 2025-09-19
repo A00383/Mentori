@@ -14,7 +14,8 @@ async function login() {
     const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-            redirectTo: `${location.origin}/Editor/editor.html`
+            // Make sure this EXACT path is added in Google Console Authorized Redirect URIs
+            redirectTo: `${location.origin}/MentoriCélula/Editor/editor.html`
         }
     });
     if (error) console.error("Login error:", error.message);
@@ -31,20 +32,16 @@ async function logout() {
 // =======================
 function renderUser(user) {
     if (user) {
-        // Logged in
         userDiv.innerHTML = `
-          <span style="color:white; margin-right: 10px;">
-            ${user.email}
-          </span>
-          <button id="logout">Cerrar sesión</button>
-        `;
+      <span style="color:white; margin-right: 10px;">${user.email}</span>
+      <button id="logout">Cerrar sesión</button>
+    `;
         document.getElementById("logout").addEventListener("click", logout);
     } else {
-        // Logged out
         userDiv.innerHTML = `
-          <button id="login">Iniciar sesión</button>
-          <button id="signup">Registrarse</button>
-        `;
+      <button id="login">Iniciar sesión</button>
+      <button id="signup">Registrarse</button>
+    `;
         document.getElementById("login").addEventListener("click", login);
         document.getElementById("signup").addEventListener("click", login);
     }
@@ -56,13 +53,12 @@ function renderUser(user) {
 (async () => {
     const { data: { session } } = await supabase.auth.getSession();
     renderUser(session?.user ?? null);
-    listUserDocs(); // also load documents on page start
+    listUserDocs();
 })();
 
-// Listen for Auth Changes
 supabase.auth.onAuthStateChange((_event, session) => {
     renderUser(session?.user ?? null);
-    listUserDocs(); // refresh documents on login/logout
+    listUserDocs();
 });
 
 // =======================
@@ -71,17 +67,17 @@ supabase.auth.onAuthStateChange((_event, session) => {
 async function listUserDocs() {
     const { data: { session } } = await supabase.auth.getSession();
     const user = session?.user;
+    const container = document.getElementById("documents-main-projects-section-projects");
+
     if (!user) {
-        // Clear the project list if not logged in
-        document.getElementById("documents-main-projects-section-projects").innerHTML = "";
+        container.innerHTML = "";
         return;
     }
 
-    const email = user.email;
     const { data, error } = await supabase
         .from("documents")
         .select("id, created_at, updated_at")
-        .eq("creator", email)
+        .eq("creator", user.email)
         .order("updated_at", { ascending: false });
 
     if (error) {
@@ -89,11 +85,10 @@ async function listUserDocs() {
         return;
     }
 
-    const container = document.getElementById("documents-main-projects-section-projects");
     container.innerHTML = "";
     data.forEach(doc => {
         const a = document.createElement("a");
-        a.href = `Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
+        a.href = `./Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
         a.textContent = `${doc.id} — last saved ${new Date(doc.updated_at).toLocaleString()}`;
         a.classList.add("project-link");
         container.appendChild(a);
@@ -107,20 +102,12 @@ createBtn.addEventListener("click", async () => {
     const { data: { session } } = await supabase.auth.getSession();
     const user = session?.user;
 
-    // Always generate an ID, whether user is logged in or not
     const newId = nanoid();
 
     if (user) {
-        // Logged in → create document in Supabase with generated id
         const { data: doc, error } = await supabase
             .from("documents")
-            .insert([
-                {
-                    id: newId,
-                    creator: user.email,
-                    content: "", // start empty
-                },
-            ])
+            .insert([{ id: newId, creator: user.email, content: "" }])
             .select()
             .single();
 
@@ -129,10 +116,8 @@ createBtn.addEventListener("click", async () => {
             return;
         }
 
-        // Redirect to editor with real DB id
-        window.location.href = `Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
+        window.location.href = `./Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
     } else {
-        // Guest → skip DB, still use generated id
-        window.location.href = `Editor/editor.html?id=${encodeURIComponent(newId)}&guest=true`;
+        window.location.href = `./Editor/editor.html?id=${encodeURIComponent(newId)}&guest=true`;
     }
 });

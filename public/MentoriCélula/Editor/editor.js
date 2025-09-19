@@ -62,6 +62,37 @@ function gatherEditorContent() {
 }
 
 // -----------------------------
+// Helper: Populate editor with content
+// -----------------------------
+function populateEditorWithContent(data) {
+    // description
+    document.getElementById("description").value = data.description || "";
+
+    // main images
+    mainimagesContainer.innerHTML = "";
+    (data.mainImages || []).forEach(src => {
+        const img = document.createElement("img");
+        img.src = src;
+        img.classList.add("main-image");
+        img.dataset.src = src;
+        img.addEventListener("click", () => {
+            if (mainimageremoveMode) mainimagesContainer.removeChild(img);
+        });
+        mainimagesContainer.appendChild(img);
+    });
+
+    // organelos
+    (data.organelos || []).forEach((item, index) => {
+        let target = item.id ? document.getElementById(item.id) : null;
+        if (!target && organelos[index]) target = organelos[index];
+        if (target) {
+            target.dataset.content = item.content || "";
+            target.dataset.image = JSON.stringify(item.image || []);
+        }
+    });
+}
+
+// -----------------------------
 // Pop-up logic
 // -----------------------------
 organelos.forEach(selectedorganel => {
@@ -76,7 +107,6 @@ organelos.forEach(selectedorganel => {
                 const popupimg = document.createElement("img");
                 popupimg.src = src;
                 popupimg.classList.add("pop-up-image");
-
                 popupimg.addEventListener("click", () => {
                     if (popupimageremovemode) {
                         popupimagecontainer.removeChild(popupimg);
@@ -117,8 +147,9 @@ popupimageinput.addEventListener("change", (e) => {
 
 popupimageremove.addEventListener("click", () => {
     popupimageremovemode = !popupimageremovemode;
-    const imgs = document.querySelectorAll(".pop-up-image");
-    imgs.forEach(img => img.classList.toggle("removable", popupimageremovemode));
+    document.querySelectorAll(".pop-up-image").forEach(img =>
+        img.classList.toggle("removable", popupimageremovemode)
+    );
     popupimageremove.textContent = popupimageremovemode ? "Cancelar quitar" : "Quitar imagen";
 });
 
@@ -192,7 +223,7 @@ savebtn.addEventListener("click", () => {
 });
 
 // -----------------------------
-// Supabase Online Save
+// Supabase Online Save & Load
 // -----------------------------
 import { supabase } from '/supabase.js';
 import { nanoid } from 'https://cdn.jsdelivr.net/npm/nanoid/nanoid.js';
@@ -208,19 +239,13 @@ async function createDocument(editorContent) {
 
     const id = nanoid();
     const now = new Date().toISOString();
-    const row = {
+    const { error } = await supabase.from('documents').insert({
         id,
         creator: user.email,
         created_at: now,
         updated_at: now,
         content: editorContent
-    };
-
-    const { data, error } = await supabase
-        .from('documents')
-        .insert(row)
-        .select()
-        .single();
+    });
 
     if (error) throw error;
     return id;
@@ -228,20 +253,16 @@ async function createDocument(editorContent) {
 
 async function updateDocument(id, editorContent) {
     const now = new Date().toISOString();
-    const { data, error } = await supabase
-        .from('documents')
+    const { error } = await supabase.from('documents')
         .update({ content: editorContent, updated_at: now })
-        .eq('id', id)
-        .select()
-        .single();
+        .eq('id', id);
 
     if (error) throw error;
-    return data;
+    return true;
 }
 
 async function loadDocumentById(id) {
-    const { data, error } = await supabase
-        .from('documents')
+    const { data, error } = await supabase.from('documents')
         .select('*')
         .eq('id', id)
         .maybeSingle();
@@ -256,22 +277,12 @@ saveonlinebutton.addEventListener("click", async () => {
 
     try {
         const user = await getCurrentUser();
-        if (!user) {
-            alert("You must be logged in to save online.");
-            return;
-        }
+        if (!user) return alert("You must be logged in to save online.");
 
         if (docId) {
             const doc = await loadDocumentById(docId);
-            if (!doc) {
-                alert("Document not found.");
-                return;
-            }
-
-            if (doc.creator !== user.email) {
-                alert("You are not the creator of this document. Cannot save.");
-                return;
-            }
+            if (!doc) return alert("Document not found.");
+            if (doc.creator !== user.email) return alert("You are not the creator of this document.");
 
             await updateDocument(docId, content);
             alert("Document saved successfully!");
@@ -293,46 +304,33 @@ loadBtn.addEventListener("click", () => loadInput.click());
 loadInput.addEventListener("change", (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (event) => {
         try {
             const data = JSON.parse(event.target.result);
-
-            // description
-            document.getElementById("description").value = data.description || "";
-
-            // main images
-            mainimagesContainer.innerHTML = "";
-            (data.mainImages || []).forEach(src => {
-                const img = document.createElement("img");
-                img.src = src;
-                img.classList.add("main-image");
-                img.dataset.src = src;
-                img.addEventListener("click", () => {
-                    if (mainimageremoveMode) mainimagesContainer.removeChild(img);
-                });
-                mainimagesContainer.appendChild(img);
-            });
-
-            // organelos
-            (data.organelos || []).forEach((item, index) => {
-                let target = item.id ? document.getElementById(item.id) : null;
-                if (!target && organelos[index]) target = organelos[index];
-                if (target) {
-                    target.dataset.content = item.content || "";
-                    target.dataset.image = JSON.stringify(item.image || []);
-                }
-            });
-
+            populateEditorWithContent(data);
             alert("Datasets loaded successfully!");
-        } catch (err) {
-            console.error(err);
-            alert("Error: file is not valid JSON text.");
+        } catch {
+            alert("Error: file is not valid JSON.");
         }
     };
     reader.readAsText(file);
     loadInput.value = "";
+});
+
+// -----------------------------
+// Auto-load dataset from Supabase on editor open
+// -----------------------------
+window.addEventListener('DOMContentLoaded', async () => {
+    const docId = new URLSearchParams(window.location.search).get("id");
+    if (docId) {
+        try {
+            const doc = await loadDocumentById(docId);
+            if (doc && doc.content) populateEditorWithContent(doc.content);
+        } catch (err) {
+            console.error("Failed to load document:", err);
+        }
+    }
 });
 
 // -----------------------------

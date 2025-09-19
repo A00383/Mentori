@@ -271,6 +271,9 @@ async function loadDocumentById(id) {
     return data;
 }
 
+// -----------------------------
+// Save online
+// -----------------------------
 saveonlinebutton.addEventListener("click", async () => {
     const content = gatherEditorContent();
     const docId = new URLSearchParams(window.location.search).get("id");
@@ -319,17 +322,35 @@ loadInput.addEventListener("change", (e) => {
 });
 
 // -----------------------------
-// Auto-load dataset from Supabase on editor open
+// Auto-load dataset & enforce creator-only access
 // -----------------------------
 window.addEventListener('DOMContentLoaded', async () => {
     const docId = new URLSearchParams(window.location.search).get("id");
-    if (docId) {
-        try {
-            const doc = await loadDocumentById(docId);
-            if (doc && doc.content) populateEditorWithContent(doc.content);
-        } catch (err) {
-            console.error("Failed to load document:", err);
+    if (!docId) return;
+
+    try {
+        const doc = await loadDocumentById(docId);
+        if (!doc) {
+            alert("Document not found.");
+            window.location.href = "view.html";
+            return;
         }
+
+        const user = await getCurrentUser();
+
+        if (!user || user.email !== doc.creator) {
+            alert("You are not authorized to edit this document. Redirecting to viewer...");
+            window.location.href = `view.html?id=${docId}`;
+            return;
+        }
+
+        // Populate editor with content
+        if (doc.content) populateEditorWithContent(doc.content);
+
+    } catch (err) {
+        console.error("Failed to load document:", err);
+        alert("Error loading document. Redirecting to viewer...");
+        window.location.href = `view.html?id=${docId}`;
     }
 });
 

@@ -82,3 +82,35 @@ async function listUserDocs() {
 
 // call on page load
 listUserDocs();
+
+const createBtn = document.getElementById("documents-main-create-section-create-celula");
+
+createBtn.addEventListener("click", async () => {
+    const { data: session } = await supabase.auth.getSession();
+    const user = session?.user;
+
+    if (!user) {
+        alert("Debes iniciar sesión para crear un archivo.");
+        return;
+    }
+
+    // Insert a new document
+    const { data, error } = await supabase
+        .from("documents")
+        .insert([
+            {
+                creator: user.email,
+                content: "", // start empty, or you can set a default template
+            },
+        ])
+        .select()
+        .single();
+
+    if (error) {
+        console.error("Error creating document:", error);
+        return;
+    }
+
+    // Redirect to editor.html?id=new_doc_id
+    window.location.href = `/editor.html?id=${encodeURIComponent(data.id)}`;
+});

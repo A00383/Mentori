@@ -332,7 +332,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         const doc = await loadDocumentById(docId);
         if (!doc) {
             alert("Document not found.");
-            window.location.href = "view.html";
+            window.location.href = "./MentoriCélula/Viewer/view.html";
             return;
         }
 
@@ -340,7 +340,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         if (!user || user.email !== doc.creator) {
             alert("You are not authorized to edit this document. Redirecting to viewer...");
-            window.location.href = `view.html?id=${docId}`;
+            window.location.href = `./MentoriCélula/Viewer/view.html?id=${docId}`;
             return;
         }
 
@@ -350,7 +350,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
         console.error("Failed to load document:", err);
         alert("Error loading document. Redirecting to viewer...");
-        window.location.href = `view.html?id=${docId}`;
+        window.location.href = `./MentoriCélula/Viewer/view.html?id=${docId}`;
     }
 });
 

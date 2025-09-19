@@ -8,6 +8,9 @@ const userDiv = document.getElementById("user");
 async function login() {
     const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
+        options: {
+            redirectTo: `${location.origin}/editor.html`
+        }
     });
     if (error) console.error("Login error:", error.message);
 }
@@ -23,18 +26,18 @@ function renderUser(user) {
     if (user) {
         // Logged in
         userDiv.innerHTML = `
-      <span style="color:white; margin-right: 10px;">
-        ${user.email}
-      </span>
-      <button id="logout">Cerrar sesión</button>
-    `;
+          <span style="color:white; margin-right: 10px;">
+            ${user.email}
+          </span>
+          <button id="logout">Cerrar sesión</button>
+        `;
         document.getElementById("logout").addEventListener("click", logout);
     } else {
         // Logged out
         userDiv.innerHTML = `
-      <button id="login">Iniciar sesión</button>
-      <button id="signup">Registrarse</button>
-    `;
+          <button id="login">Iniciar sesión</button>
+          <button id="signup">Registrarse</button>
+        `;
         document.getElementById("login").addEventListener("click", login);
         document.getElementById("signup").addEventListener("click", login);
     }
@@ -50,15 +53,12 @@ supabase.auth.onAuthStateChange((_event, session) => {
     renderUser(session?.user ?? null);
 });
 
-import { supabase } from './supabase.js';
-
+// ---- Load User Documents ----
 async function listUserDocs() {
-    const { data: session } = await supabase.auth.getSession();
+    const { data: { session } } = await supabase.auth.getSession();
     const user = session?.user;
-    if (!user) {
-        // hide projects UI or show message
-        return;
-    }
+    if (!user) return;
+
     const email = user.email;
     const { data, error } = await supabase
         .from('documents')
@@ -81,19 +81,3 @@ async function listUserDocs() {
 
 // call on page load
 listUserDocs();
-// also consider subscribing to auth state changes to refresh list when user logs in/out
-
-import { supabase } from './supabase.js'; // adjust path as your project uses
-const loginBtn = document.getElementById('login');
-
-loginBtn.addEventListener('click', async () => {
-    // redirectTo should point to the editor page where you handle session + redirect logic
-    const redirect = `${location.origin}/editor.html`;
-    const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: redirect }
-    });
-    if (error) console.error('OAuth sign-in error', error);
-    // supabase will redirect the browser to Google; after successful sign-in
-    // Google -> Supabase -> redirectTo (editor.html)
-});

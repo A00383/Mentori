@@ -22,16 +22,16 @@ const popupname = document.getElementById('pop-up-name');
 const mainorganelname = document.getElementById('organelo');
 
 // Organelles
-const membranacelular = document.getElementById ('membrana celular');
-const citoplasma = document.getElementById ('citoplasma');
-const nucleolo = document.getElementById ('nucleolo');
-const nucleo = document.getElementById ('nucleo');
-const reticuloendoplasmatico = document.getElementById ('reticulo endoplasmatico');
-const centriolos = document.getElementById ('centriolos');
-const microtubulos = document.getElementById ('microtubulos');
-const mitocondrias = document.getElementById ('mitocondrias');
-const lisosomas = document.getElementById ('lisosomas');
-const aparatodegolgi = document.getElementById ('aparato de golgi');
+const membranacelular = document.getElementById('membrana celular');
+const citoplasma = document.getElementById('citoplasma');
+const nucleolo = document.getElementById('nucleolo');
+const nucleo = document.getElementById('nucleo');
+const reticuloendoplasmatico = document.getElementById('reticulo endoplasmatico');
+const centriolos = document.getElementById('centriolos');
+const microtubulos = document.getElementById('microtubulos');
+const mitocondrias = document.getElementById('mitocondrias');
+const lisosomas = document.getElementById('lisosomas');
+const aparatodegolgi = document.getElementById('aparato de golgi');
 
 // -----------------------------
 // State
@@ -292,7 +292,8 @@ saveonlinebutton.addEventListener("click", async () => {
         } else {
             const newId = await createDocument(content);
             alert("New document created successfully!");
-            window.location.href = `${window.location.pathname}?id=${newId}`;
+            // Redirect using absolute path from root
+            window.location.href = `/MentoriCélula/Editor/editor.html?id=${newId}`;
         }
     } catch (err) {
         console.error(err);
@@ -332,7 +333,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         const doc = await loadDocumentById(docId);
         if (!doc) {
             alert("Document not found.");
-            window.location.href = "./MentoriCélula/Viewer/view.html";
+            window.location.href = "/MentoriCélula/Viewer/view.html";
             return;
         }
 
@@ -340,7 +341,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         if (!user || user.email !== doc.creator) {
             alert("You are not authorized to edit this document. Redirecting to viewer...");
-            window.location.href = `./MentoriCélula/Viewer/view.html?id=${docId}`;
+            window.location.href = `/MentoriCélula/Viewer/view.html?id=${docId}`;
             return;
         }
 
@@ -350,7 +351,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
         console.error("Failed to load document:", err);
         alert("Error loading document. Redirecting to viewer...");
-        window.location.href = `./MentoriCélula/Viewer/view.html?id=${docId}`;
+        window.location.href = `/MentoriCélula/Viewer/view.html?id=${docId}`;
     }
 });
 

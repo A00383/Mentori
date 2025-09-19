@@ -180,9 +180,9 @@ mainremoveBtn.addEventListener("click", () => {
     mainremoveBtn.textContent = mainimageremoveMode ? "Cancelar quitar" : "Quitar imagen";
 });
 
-const downloadbtn = document.getElementById("downloadbtn");
+const savebtn = document.getElementById("savebtn");
 
-downloadbtn.addEventListener("click", () => {
+savebtn.addEventListener("click", () => {
     const savedataexport = {
         description: document.getElementById("description").value || "",
         mainImages: [...mainimagesContainer.querySelectorAll("img")].map(img => img.src),

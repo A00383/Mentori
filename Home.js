@@ -14,7 +14,7 @@ async function login() {
     const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-            redirectTo: `${location.origin}/editor.html`
+            redirectTo: `${location.origin}/Editor/editor.html`
         }
     });
     if (error) console.error("Login error:", error.message);
@@ -93,7 +93,7 @@ async function listUserDocs() {
     container.innerHTML = "";
     data.forEach(doc => {
         const a = document.createElement("a");
-        a.href = `/editor.html?id=${encodeURIComponent(doc.id)}`;
+        a.href = `Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
         a.textContent = `${doc.id} — last saved ${new Date(doc.updated_at).toLocaleString()}`;
         a.classList.add("project-link");
         container.appendChild(a);
@@ -130,9 +130,9 @@ createBtn.addEventListener("click", async () => {
         }
 
         // Redirect to editor with real DB id
-        window.location.href = `/editor.html?id=${encodeURIComponent(doc.id)}`;
+        window.location.href = `Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
     } else {
         // Guest → skip DB, still use generated id
-        window.location.href = `/editor.html?id=${encodeURIComponent(newId)}&guest=true`;
+        window.location.href = `Editor/editor.html?id=${encodeURIComponent(newId)}&guest=true`;
     }
 });

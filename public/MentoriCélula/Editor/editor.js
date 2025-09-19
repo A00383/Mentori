@@ -403,7 +403,7 @@ aparatodegolgi.addEventListener('mouseleave', () => {
     mainorganelname.textContent = "Célula animal";
 });
 
-import { supabase } from '../../supabase.js';
+import { supabase } from '/supabase.js';
 import { nanoid } from 'https://cdn.jsdelivr.net/npm/nanoid/nanoid.js';
 
 async function getCurrentUser() {

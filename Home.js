@@ -1,4 +1,6 @@
+// Import Supabase client
 import { supabase } from "./supabase.js";
+import { nanoid } from "https://cdn.jsdelivr.net/npm/nanoid/nanoid.js";
 
 const userDiv = document.getElementById("user");
 
@@ -62,62 +64,28 @@ async function listUserDocs() {
 
     const email = user.email;
     const { data, error } = await supabase
-        .from('documents')
-        .select('id, created_at, updated_at')
-        .eq('creator', email)
-        .order('updated_at', { ascending: false });
+        .from("documents")
+        .select("id, created_at, updated_at")
+        .eq("creator", email)
+        .order("updated_at", { ascending: false });
 
     if (error) return console.error(error);
 
-    const container = document.getElementById('documents-main-projects-section');
-    container.innerHTML = '';
+    const container = document.getElementById("documents-main-projects-section");
+    container.innerHTML = "";
     data.forEach(doc => {
-        const a = document.createElement('a');
+        const a = document.createElement("a");
         a.href = `/editor.html?id=${encodeURIComponent(doc.id)}`;
         a.textContent = `${doc.id} — last saved ${new Date(doc.updated_at).toLocaleString()}`;
-        a.classList.add('project-link');
+        a.classList.add("project-link");
         container.appendChild(a);
     });
 }
 
-// call on page load
+// Call on page load
 listUserDocs();
 
-const createBtn = document.getElementById("documents-main-create-section-create-celula");
-
-createBtn.addEventListener("click", async () => {
-    const { data, error } = await supabase.auth.getSession();
-    const user = data.session?.user;
-
-    if (user) {
-        // Logged in → create document in Supabase
-        const { data: doc, error: insertError } = await supabase
-            .from("documents")
-            .insert([
-                {
-                    creator: user.email,
-                    content: "", // start empty
-                },
-            ])
-            .select()
-            .single();
-
-        if (insertError) {
-            console.error("Error creating document:", insertError);
-            return;
-        }
-
-        // Redirect to editor with real DB id
-        window.location.href = `/editor.html?id=${encodeURIComponent(doc.id)}`;
-    } else {
-        // Guest → generate temporary ID and skip database
-        const tempId = crypto.randomUUID();
-        window.location.href = `/editor.html?id=${encodeURIComponent(tempId)}&guest=true`;
-    }
-});
-
-import { nanoid } from "https://cdn.jsdelivr.net/npm/nanoid/nanoid.js";
-
+// ---- Create new file ----
 const createBtn = document.getElementById("documents-main-create-section-create-celula");
 
 createBtn.addEventListener("click", async () => {

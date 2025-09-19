@@ -403,3 +403,126 @@ aparatodegolgi.addEventListener('mouseleave', () => {
     mainorganelname.textContent = "Célula animal";
 });
 
+import { supabase } from './supabase.js';
+import { nanoid } from 'https://cdn.jsdelivr.net/npm/nanoid/nanoid.js';
+
+async function getCurrentUser() {
+    // getSession/getUser API
+    const { data } = await supabase.auth.getSession(); // returns data.session
+    // data.session?.user contains user info; cross-check docs for exact shape
+    return data?.session?.user ?? null;
+}
+
+// create a new document and return its id
+async function createDocument(editorContent) {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Must be logged-in to save document');
+
+    const id = nanoid();
+    const now = new Date().toISOString();
+    const row = {
+        id,
+        creator: user.email,          // store email; or use user.id (auth.sub) if you prefer
+        created_at: now,
+        updated_at: now,
+        content: editorContent
+    };
+
+    const { data, error } = await supabase
+        .from('documents')
+        .insert(row)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return id;
+}
+
+// update an existing doc by id
+async function updateDocument(id, editorContent) {
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+        .from('documents')
+        .update({ content: editorContent, updated_at: now })
+        .eq('id', id)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+}
+
+// load a document by id
+async function loadDocumentById(id) {
+    const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+    if (error) throw error;
+    return data; // may be null if not found
+}
+
+// Example wiring on editor load:
+(async function initEditor() {
+    const urlParams = new URLSearchParams(location.search);
+    const docId = urlParams.get('id'); // null if not present
+
+    const user = await getCurrentUser(); // null if anonymous
+    if (docId) {
+        const doc = await loadDocumentById(docId);
+        if (!doc) {
+            // doc not found — treat as blank or show 404
+            console.warn('Document not found');
+            return;
+        }
+
+        // owner? if not owner -> view-only mode
+        const isOwner = user && (user.email === doc.creator);
+        if (!isOwner) {
+            setEditorReadOnly(true);     // implement this to disable edits in your editor
+            populateEditorWithContent(doc.content);
+        } else {
+            setEditorReadOnly(false);
+            populateEditorWithContent(doc.content);
+        }
+    } else {
+        // no doc id in URL
+        // if user is logged, you may offer "Create new (save)" which will call createDocument(...)
+        // if not logged, the editor should behave as anonymous (no id / save disabled)
+        if (!user) {
+            setEditorAnonymousMode(); // implement to reflect UI differences
+        } else {
+            // logged-in + no id — a possible route is to auto-create on first save
+        }
+    }
+})();
+
+// Hook up your Save button:
+document.getElementById('save-btn')?.addEventListener('click', async () => {
+    const urlParams = new URLSearchParams(location.search);
+    const docId = urlParams.get('id');
+    const content = gatherEditorContent(); // implement to read editor state (should be a JSON-able object)
+
+    try {
+        if (docId) {
+            await updateDocument(docId, content);
+            // update UI, toast, etc.
+        } else {
+            // no id -> only create if logged in
+            const user = await getCurrentUser();
+            if (!user) {
+                alert('You must be signed in to save.');
+                return;
+            }
+            const id = await createDocument(content);
+            // redirect to editor with id appended
+            location.href = `${location.origin}/editor.html?id=${id}`;
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Save failed: ' + err.message);
+    }
+});
+

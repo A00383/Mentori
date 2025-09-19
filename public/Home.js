@@ -116,8 +116,8 @@ createBtn.addEventListener("click", async () => {
             return;
         }
 
-        window.location.href = `./Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
+        window.location.href = `/MentoriCélula/Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
     } else {
-        window.location.href = `./Editor/editor.html?id=${encodeURIComponent(newId)}&guest=true`;
+        window.location.href = `/MentoriCélula/Editor/editor.html?id=${encodeURIComponent(newId)}&guest=true`;
     }
 });

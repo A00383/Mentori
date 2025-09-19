@@ -271,6 +271,33 @@ async function loadDocumentById(id) {
     return data;
 }
 
+// ------------------------------
+// Copy Button
+// ------------------------------
+const copyBtn = document.getElementById('copybtn');
+
+copyBtn.addEventListener('click', async () => {
+    const content = gatherEditorContent(); // get current editor content
+    const user = await getCurrentUser();
+
+    if (!user) {
+        alert('You must be signed in to copy this document.');
+        return;
+    }
+
+    try {
+        // Create new document with same content
+        const newId = await createDocument(content);
+
+        // Open new editor window with new document
+        window.open(`/MentoriCélula/Editor/editor.html?id=${newId}`, '_blank');
+    } catch (err) {
+        console.error(err);
+        alert('Failed to copy document: ' + err.message);
+    }
+});
+
+
 // -----------------------------
 // Save online
 // -----------------------------

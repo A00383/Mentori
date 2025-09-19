@@ -39,7 +39,7 @@ closepopup.addEventListener("click", () => {
 });
 
 // ---------- SAVE ----------
-const savebtn = document.getElementById("savebtn");
+const savebtn = document.getElementById("downloadbtn");
 const mainimagesContainer = document.getElementById("main-image-images");
 
 savebtn.addEventListener("click", () => {

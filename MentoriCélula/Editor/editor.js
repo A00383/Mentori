@@ -526,3 +526,25 @@ document.getElementById('save-btn')?.addEventListener('click', async () => {
     }
 });
 
+const params = new URLSearchParams(window.location.search);
+const id = params.get("id");
+const isGuest = params.get("guest") === "true";
+
+if (isGuest) {
+    // Don’t load/save from Supabase
+    console.log("Guest mode, local-only document:", id);
+} else {
+    // Fetch document from Supabase by id
+    const { data, error } = await supabase
+        .from("documents")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+    if (error) {
+        console.error("Error loading document:", error);
+    } else {
+        console.log("Loaded doc:", data);
+        // TODO: populate your editor UI with data.content here
+    }
+}

@@ -86,31 +86,32 @@ listUserDocs();
 const createBtn = document.getElementById("documents-main-create-section-create-celula");
 
 createBtn.addEventListener("click", async () => {
-    const { data: session } = await supabase.auth.getSession();
-    const user = session?.user;
+    const { data, error } = await supabase.auth.getSession();
+    const user = data.session?.user;
 
-    if (!user) {
-        alert("Debes iniciar sesión para crear un archivo.");
-        return;
+    if (user) {
+        // Logged in → create document in Supabase
+        const { data: doc, error: insertError } = await supabase
+            .from("documents")
+            .insert([
+                {
+                    creator: user.email,
+                    content: "", // start empty
+                },
+            ])
+            .select()
+            .single();
+
+        if (insertError) {
+            console.error("Error creating document:", insertError);
+            return;
+        }
+
+        // Redirect to editor with real DB id
+        window.location.href = `/editor.html?id=${encodeURIComponent(doc.id)}`;
+    } else {
+        // Guest → generate temporary ID and skip database
+        const tempId = crypto.randomUUID();
+        window.location.href = `/editor.html?id=${encodeURIComponent(tempId)}&guest=true`;
     }
-
-    // Insert a new document
-    const { data, error } = await supabase
-        .from("documents")
-        .insert([
-            {
-                creator: user.email,
-                content: "", // start empty, or you can set a default template
-            },
-        ])
-        .select()
-        .single();
-
-    if (error) {
-        console.error("Error creating document:", error);
-        return;
-    }
-
-    // Redirect to editor.html?id=new_doc_id
-    window.location.href = `/editor.html?id=${encodeURIComponent(data.id)}`;
 });

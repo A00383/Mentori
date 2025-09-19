@@ -88,7 +88,7 @@ async function listUserDocs() {
     container.innerHTML = "";
     data.forEach(doc => {
         const a = document.createElement("a");
-        a.href = `/MentoriCélula/Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
+        a.href = `./MentoriCélula/Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
         a.textContent = `${doc.id} — last saved ${new Date(doc.updated_at).toLocaleString()}`;
         a.classList.add("project-link");
         container.appendChild(a);

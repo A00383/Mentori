@@ -9,8 +9,12 @@
         import { nanoid } from 'https://cdn.jsdelivr.net/npm/nanoid/nanoid.js';
         window.nanoid = nanoid;
     </script>
+    <script>
+        console.log("Testing path to supabase.js");
+    </script>
 </head>
-
+<script type="module" src="../supabase.js"></script>
+<script type="module" src="/MentoriCélula/Editor/editor.js"></script>
 <body id="body">
 
 <h1 id="organelo">
@@ -116,12 +120,6 @@
 </div>
 
 <textarea id="description" placeholder="" data-maintext=""> </textarea>
-
-<script>
-    console.log("Testing path to supabase.js");
-</script>
-<script type="module" src="../../supabase.js"></script>
-<script type="module" src="editor.js"></script>
 
 </body>
 </html>

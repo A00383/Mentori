@@ -3,8 +3,11 @@ import { supabase } from "./supabase.js";
 import { nanoid } from "https://cdn.jsdelivr.net/npm/nanoid/nanoid.js";
 
 const userDiv = document.getElementById("user");
+const createBtn = document.getElementById("documents-main-create-section-create-celula");
 
-// ---- Auth Helpers ----
+// =======================
+// AUTH HELPERS
+// =======================
 
 // Login / Signup (Google OAuth)
 async function login() {
@@ -23,7 +26,9 @@ async function logout() {
     renderUser(null);
 }
 
-// ---- UI Rendering ----
+// =======================
+// UI RENDERING
+// =======================
 function renderUser(user) {
     if (user) {
         // Logged in
@@ -45,22 +50,32 @@ function renderUser(user) {
     }
 }
 
-// ---- Initial Session ----
+// =======================
+// INITIAL SESSION
+// =======================
 (async () => {
     const { data: { session } } = await supabase.auth.getSession();
     renderUser(session?.user ?? null);
+    listUserDocs(); // also load documents on page start
 })();
 
-// ---- Listen for Auth Changes ----
+// Listen for Auth Changes
 supabase.auth.onAuthStateChange((_event, session) => {
     renderUser(session?.user ?? null);
+    listUserDocs(); // refresh documents on login/logout
 });
 
-// ---- Load User Documents ----
+// =======================
+// LOAD USER DOCUMENTS
+// =======================
 async function listUserDocs() {
     const { data: { session } } = await supabase.auth.getSession();
     const user = session?.user;
-    if (!user) return;
+    if (!user) {
+        // Clear the project list if not logged in
+        document.getElementById("documents-main-projects-section-projects").innerHTML = "";
+        return;
+    }
 
     const email = user.email;
     const { data, error } = await supabase
@@ -69,9 +84,12 @@ async function listUserDocs() {
         .eq("creator", email)
         .order("updated_at", { ascending: false });
 
-    if (error) return console.error(error);
+    if (error) {
+        console.error("Error fetching documents:", error);
+        return;
+    }
 
-    const container = document.getElementById("documents-main-projects-section");
+    const container = document.getElementById("documents-main-projects-section-projects");
     container.innerHTML = "";
     data.forEach(doc => {
         const a = document.createElement("a");
@@ -82,22 +100,19 @@ async function listUserDocs() {
     });
 }
 
-// Call on page load
-listUserDocs();
-
-// ---- Create new file ----
-const createBtn = document.getElementById("documents-main-create-section-create-celula");
-
+// =======================
+// CREATE NEW FILE
+// =======================
 createBtn.addEventListener("click", async () => {
-    const { data, error } = await supabase.auth.getSession();
-    const user = data.session?.user;
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
 
     // Always generate an ID, whether user is logged in or not
     const newId = nanoid();
 
     if (user) {
         // Logged in → create document in Supabase with generated id
-        const { data: doc, error: insertError } = await supabase
+        const { data: doc, error } = await supabase
             .from("documents")
             .insert([
                 {
@@ -109,8 +124,8 @@ createBtn.addEventListener("click", async () => {
             .select()
             .single();
 
-        if (insertError) {
-            console.error("Error creating document:", insertError);
+        if (error) {
+            console.error("Error creating document:", error);
             return;
         }
 

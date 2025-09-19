@@ -44,9 +44,10 @@ function renderUser(user) {
 }
 
 // ---- Initial Session ----
-supabase.auth.getSession().then(({ data: { session } }) => {
+(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
     renderUser(session?.user ?? null);
-});
+})();
 
 // ---- Listen for Auth Changes ----
 supabase.auth.onAuthStateChange((_event, session) => {

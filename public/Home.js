@@ -86,12 +86,35 @@ async function listUserDocs() {
     }
 
     container.innerHTML = "";
+
     data.forEach(doc => {
-        const a = document.createElement("a");
-        a.href = `./MentoriCélula/Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
-        a.textContent = `${doc.id} — last saved ${new Date(doc.updated_at).toLocaleString()}`;
-        a.classList.add("project-link");
-        container.appendChild(a);
+        // Create project card
+        const card = document.createElement("div");
+        card.classList.add("project-card");
+        card.id = doc.id; // Use the document's ID as the div's ID
+
+        // Project title
+        const title = document.createElement("div");
+        title.classList.add("project-title");
+        title.textContent = doc.id; // or any custom title
+
+        // Project thumbnail (placeholder for now)
+        const thumbnail = document.createElement("img");
+        thumbnail.classList.add("project-thumbnail");
+        thumbnail.src = "https://via.placeholder.com/220x140?text=Thumbnail"; // placeholder
+        thumbnail.alt = "Project Thumbnail";
+
+        // Append title and thumbnail to card
+        card.appendChild(thumbnail);
+        card.appendChild(title);
+
+        // Add click handler to open editor for this project
+        card.addEventListener("click", () => {
+            window.location.href = `/MentoriCélula/Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
+        });
+
+        // Add card to container
+        container.appendChild(card);
     });
 }
 

@@ -54,6 +54,12 @@ body {
     height: 50%;
 }
 
+#return-homebtn {
+    background-color: darkgreen;
+    aspect-ratio: 1/1;
+    height: 50%;
+}
+
 #mainload {
     display: none;
 }

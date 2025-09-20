@@ -171,6 +171,28 @@ popup.addEventListener('click', (e) => {
     }
 });
 
+// -------------------
+// Cursor remove mode
+//--------------------
+
+function toggleCursor(isRemoveMode) {
+    if (isRemoveMode) {
+        document.body.classList.add("eraser-cursor");
+    } else {
+        document.body.classList.remove("eraser-cursor");
+    }
+}
+
+popupimageremove.addEventListener("click", () => {
+    popupimageremovemode = !popupimageremovemode;
+    toggleCursor(popupimageremovemode);
+});
+
+mainremoveBtn.addEventListener("click", () => {
+    mainimageremoveMode = !mainimageremoveMode;
+    toggleCursor(mainimageremoveMode);
+});
+
 // -----------------------------
 // Main images logic
 // -----------------------------

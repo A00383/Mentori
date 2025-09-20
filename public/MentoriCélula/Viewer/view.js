@@ -176,11 +176,49 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 // -----------------------------
-// Copy Button (disabled in viewer?)
+// Copy Button (duplicate doc)
 // -----------------------------
 if (copyBtn) {
-    copyBtn.addEventListener('click', () => {
-        alert("Copying documents is not available in Viewer mode.");
+    copyBtn.addEventListener('click', async () => {
+        const docId = new URLSearchParams(window.location.search).get("id");
+        if (!docId) {
+            alert("No document to copy.");
+            return;
+        }
+
+        try {
+            // Get the current document
+            const originalDoc = await loadDocumentById(docId);
+            if (!originalDoc) {
+                alert("Document not found.");
+                return;
+            }
+
+            // Create new document with same content
+            const { data, error } = await supabase
+                .from("documents")
+                .insert([
+                    {
+                        content: originalDoc.content,
+                        created_at: new Date().toISOString()
+                    }
+                ])
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            // Redirect to the new Editor page
+            if (data && data.id) {
+                window.location.href = `/MentoriCélula/Editor/editor.html?id=${encodeURIComponent(data.id)}`;
+            } else {
+                alert("Failed to create a copy.");
+            }
+
+        } catch (err) {
+            console.error("Copy failed:", err);
+            alert("Error copying document.");
+        }
     });
 }
 

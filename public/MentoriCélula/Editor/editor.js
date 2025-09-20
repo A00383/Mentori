@@ -411,5 +411,3 @@ setupOrganelName(microtubulos, "Microtúbulos");
 setupOrganelName(mitocondrias, "Mitocondrias");
 setupOrganelName(lisosomas, "Lisosomas");
 setupOrganelName(aparatodegolgi, "Aparato de Golgi");
-
-

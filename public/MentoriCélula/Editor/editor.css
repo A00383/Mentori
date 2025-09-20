@@ -128,9 +128,6 @@ body {
     cursor: pointer;
 }
 
-.main-image.removable:hover {
-    transform: scale(1.05);
-    outline: 2px solid red;
 }
 
 #organelo {

@@ -65,7 +65,6 @@ function gatherEditorContent() {
 // Helper: Populate editor with content
 // -----------------------------
 function populateEditorWithContent(data) {
-    // description
     document.getElementById("description").value = data.description || "";
 
     // main images
@@ -145,12 +144,17 @@ popupimageinput.addEventListener("change", (e) => {
     popupimageinput.value = "";
 });
 
+// Unified listener for remove button
 popupimageremove.addEventListener("click", () => {
     popupimageremovemode = !popupimageremovemode;
+
     document.querySelectorAll(".pop-up-image").forEach(img =>
         img.classList.toggle("removable", popupimageremovemode)
     );
+
     popupimageremove.textContent = popupimageremovemode ? "Cancelar quitar" : "Quitar imagen";
+
+    toggleCursor(popupimageremovemode);
 });
 
 savepopup.addEventListener('click', () => {
@@ -160,21 +164,30 @@ savepopup.addEventListener('click', () => {
     currentogranel.dataset.image = JSON.stringify(imgs);
 });
 
-closepopup.addEventListener("click", () => popup.classList.remove("active"));
+// Reset state when closing popup
+closepopup.addEventListener("click", () => {
+    popup.classList.remove("active");
+    popupimageremovemode = false;
+    popupimageremove.textContent = "Quitar imagen";
+    toggleCursor(false);
+});
 
 popup.addEventListener('click', (e) => {
     if (e.target === popup && currentogranel) {
         currentogranel.dataset.content = popupmessage.value;
         const imgs = [...popupimagecontainer.querySelectorAll("img")].map(img => img.src);
         currentogranel.dataset.image = JSON.stringify(imgs);
+
         popup.classList.remove('active');
+        popupimageremovemode = false;
+        popupimageremove.textContent = "Quitar imagen";
+        toggleCursor(false);
     }
 });
 
 // -------------------
 // Cursor remove mode
-//--------------------
-
+// -------------------
 function toggleCursor(isRemoveMode) {
     if (isRemoveMode) {
         document.body.classList.add("eraser-cursor");
@@ -182,16 +195,6 @@ function toggleCursor(isRemoveMode) {
         document.body.classList.remove("eraser-cursor");
     }
 }
-
-popupimageremove.addEventListener("click", () => {
-    popupimageremovemode = !popupimageremovemode;
-    toggleCursor(popupimageremovemode);
-});
-
-mainremoveBtn.addEventListener("click", () => {
-    mainimageremoveMode = !mainimageremoveMode;
-    toggleCursor(mainimageremoveMode);
-});
 
 // -----------------------------
 // Main images logic
@@ -225,6 +228,7 @@ mainremoveBtn.addEventListener("click", () => {
         img.classList.toggle("removable", mainimageremoveMode)
     );
     mainremoveBtn.textContent = mainimageremoveMode ? "Cancelar quitar" : "Quitar imagen";
+    toggleCursor(mainimageremoveMode);
 });
 
 // -----------------------------
@@ -299,7 +303,7 @@ async function loadDocumentById(id) {
 const copyBtn = document.getElementById('copybtn');
 
 copyBtn.addEventListener('click', async () => {
-    const content = gatherEditorContent(); // get current editor content
+    const content = gatherEditorContent();
     const user = await getCurrentUser();
 
     if (!user) {
@@ -308,17 +312,13 @@ copyBtn.addEventListener('click', async () => {
     }
 
     try {
-        // Create new document with same content
         const newId = await createDocument(content);
-
-        // Open new editor window with new document
         window.open(`/MentoriCélula/Editor/editor.html?id=${newId}`, '_blank');
     } catch (err) {
         console.error(err);
         alert('Failed to copy document: ' + err.message);
     }
 });
-
 
 // -----------------------------
 // Save online
@@ -341,7 +341,6 @@ saveonlinebutton.addEventListener("click", async () => {
         } else {
             const newId = await createDocument(content);
             alert("New document created successfully!");
-            // Redirect using absolute path from root
             window.location.href = `/MentoriCélula/Editor/editor.html?id=${newId}`;
         }
     } catch (err) {
@@ -394,7 +393,6 @@ window.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // Populate editor with content
         if (doc.content) populateEditorWithContent(doc.content);
 
     } catch (err) {
@@ -403,16 +401,14 @@ window.addEventListener('DOMContentLoaded', async () => {
         window.location.href = `/MentoriCélula/Viewer/view.html?id=${docId}`;
     }
 });
+
 //---------------------
 // Return home button
 //---------------------
-
 const returnHomeBtn = document.getElementById("return-homebtn");
-
 returnHomeBtn.addEventListener("click", () => {
     window.location.href = "/index.html";
 });
-
 
 // -----------------------------
 // Organelles hover + click names

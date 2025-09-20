@@ -18,14 +18,27 @@ body {
     overflow: hidden;
 }
 
-#rightui {
-    grid-row: 1; grid-column-start: 3;
+/* Left & right UI panels */
+#rightui, #leftui {
     width: 100%;
     height: 100%;
+    display: flex;
+    justify-content: space-evenly;
+    align-items: center;
 }
 
+#rightui { grid-row: 1; grid-column: 3; }
+#leftui  { grid-row: 1; grid-column: 1; }
+
+/* Buttons */
 #savebtn {
     background-color: blue;
+    aspect-ratio: 1/1;
+    height: 50%;
+}
+
+#save-online-btn {
+    background-color: blueviolet;
     aspect-ratio: 1/1;
     height: 50%;
 }
@@ -36,14 +49,14 @@ body {
     height: 50%;
 }
 
-#leftui {
-    grid-row: 1; grid-column-start: 1;
-    width: 100%;
-    height: 100%;
+#loadbtn {
+    background-color: green;
+    aspect-ratio: 1/1;
+    height: 50%;
 }
 
-#loadbtn{
-    background-color: green;
+#return-homebtn {
+    background-color: darkgreen;
     aspect-ratio: 1/1;
     height: 50%;
 }
@@ -52,22 +65,16 @@ body {
     display: none;
 }
 
+/* Main image container now only shows images */
 #main-image-container {
-    display: grid;
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr;
-    flex-direction: row;
+    display: flex;
     justify-content: center;
-    align-items: start;
+    align-items: flex-start;
     min-height: 0;
     overflow: hidden;
     width: 99%;
     height: 99%;
     grid-row: 2; grid-column: 1;
-}
-
-#main-image-input {
-    display: none;
 }
 
 #main-image-images {
@@ -85,7 +92,6 @@ body {
     overflow-x: hidden;
 }
 
-
 .main-image {
     display: block;
     max-width: 100%;
@@ -93,16 +99,7 @@ body {
     object-fit: contain;
 }
 
-.main-image.removable {
-    cursor: pointer;
-}
-
-.main-image.removable:hover {
-    transform: scale(1.05);
-    outline: 2px solid red;
-}
-
-
+/* Title */
 #organelo {
     grid-row: 1; grid-column: 2;
     display: flex;
@@ -116,19 +113,27 @@ body {
     background-color: white;
     width: 80%;
     max-height: 80%;
-    padding: 1% 1% 1% 1%;
+    padding: 1%;
     border: 2px solid black;
-    margin: 1% auto;}
-.organelos{
-    fill: transparent; opacity: 1; fill-opacity: 1; stroke: #000000; fill-rule: evenodd;
+    margin: 1% auto;
 }
 
-.organelos:hover{
+/* Organelle styles (kept as is) */
+.organelos {
+    fill: transparent;
+    opacity: 1;
+    fill-opacity: 1;
+    stroke: #000000;
+    fill-rule: evenodd;
+}
+
+.organelos:hover {
     stroke: black;
     fill: blue;
     stroke-width: 3;
 }
 
+/* Cell container */
 #celula {
     grid-row: 2; grid-column: 2;
     display: flex;
@@ -140,12 +145,11 @@ body {
 #celulasvg {
     width: 100%;
     height: 100%;
-    aspect-ratio: 350 / 406
+    aspect-ratio: 350 / 406;
 }
 
-
-
-#pop-up{
+/* Popup */
+#pop-up {
     position: fixed;
     top: 0;
     left: 0;
@@ -155,17 +159,15 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    visibility: hidden
-; /* hidden by default */
+    visibility: hidden;
     opacity: 0;
     transition: opacity 0.3s ease, visibility 0.3s ease;
     z-index: 1000;
 }
-#pop-up.active{
+#pop-up.active {
     visibility: visible;
     opacity: 1;
 }
-
 
 #pop-up-content {
     background: #fff;
@@ -179,29 +181,17 @@ body {
     grid-template-rows: 1fr 10fr;
     grid-column-gap: 1%;
     grid-row-gap: 0;
-
     overflow: auto;
     box-shadow: 0 4px 20px rgba(0,0,0,0.25);
 }
 
-#close-pop-up{
-    display: none;
+#close-pop-up {
     grid-row: 1;
     grid-column: 2;
     height: 75%;
     justify-self: end;
-    padding: 1% 1% 1% 1%;
+    padding: 1%;
     background-color: red;
-}
-
-#save-pop-up{
-    display: none;
-    grid-row: 1;
-    grid-column: 1;
-    height: 75%;
-    justify-self: start;
-    padding: 1% 1% 1% 1%;
-    background-color: #add8e6;
 }
 
 #pop-up-name {
@@ -218,33 +208,21 @@ body {
     resize: none;
     grid-area: 2 / 2 / 3 / 3;
     display: flex;
-    align-self: start;   /* stick to top of grid cell */
+    align-self: start;
     justify-self: start;
     width: 100%;
     height: 100%;
     font-size: 1.2rem;
+    background-color: #f9f9f9;
 }
 
+/* Popup image section */
 #pop-up-image-section {
     grid-column: 1;
     grid-row: 2;
-    display: grid;
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr;
+    display: flex;
+    flex-direction: column;
     min-height: 0;
-}
-
-.pop-up-image {
-    display: block;
-    max-width: 100%;
-    height: auto;
-    object-fit: contain;
-}
-
-#pop-up-image-section-buttons {
-    display: none;
-    justify-content: space-between;
-    align-items: flex-start;
 }
 
 #pop-up-image-section-images {
@@ -262,20 +240,18 @@ body {
     overflow-x: hidden;
 }
 
-#pop-up-image-add{
-    background-color: #add8e6;
-    width: 49%;
-}
-
-#pop-up-image-remove{
-    background-color: red;
-    width: 49%;
+.pop-up-image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    object-fit: contain;
 }
 
 #pop-up-image-file {
     display: none;
 }
 
+/* Description panel */
 #description {
     resize: none;
     grid-row: 2; grid-column: 3;
@@ -285,4 +261,5 @@ body {
     width: 99%;
     height: 99%;
     font-size: 1.2rem;
+    background-color: #f9f9f9;
 }

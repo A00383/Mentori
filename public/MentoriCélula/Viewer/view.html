@@ -1,12 +1,18 @@
 <!DOCTYPE html>
-<html lang="es" xmlns="http://www.w3.org/1999/html">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Célula Ver</title>
+    <title>Célula animal</title>
     <link rel="stylesheet" href="view.css">
+    <script type="module">
+        import { nanoid } from 'https://cdn.jsdelivr.net/npm/nanoid/nanoid.js';
+        window.nanoid = nanoid;
+    </script>
+    <script>
+        console.log("Testing path to supabase.js");
+    </script>
 </head>
-
 <body id="body">
 
 <h1 id="organelo">
@@ -16,10 +22,12 @@
 <div id="leftui">
     <button id="loadbtn"> </button>
     <input id="mainload" type="file" accept=".txt">
+    <button id="return-homebtn"></button>
 </div>
 
 <div id="rightui">
     <button id="savebtn"></button>
+    <button id="save-online-btn"></button>
     <button id="copybtn"></button>
 </div>
 
@@ -89,27 +97,22 @@
          transform="translate(0,10.398952)" /></g></g></svg>
 </div>
 
-<script src="view.js" defer></script>
-<script src="https://unpkg.com/@supabase/supabase-js"></script>
-<script src="supabase.js"></script>
-
 <div id="pop-up">
     <div id="pop-up-content">
         <div id="pop-up-name"></div>
         <textarea id="pop-up-message" placeholder="" readonly></textarea>
-        <button id="save-pop-up"></button>
-        <button id="close-pop-up"></button>
+        <button id="close-pop-up">Cerrar</button>
         <div id="pop-up-image-section">
             <div id="pop-up-image-section-images">
+                <input id="pop-up-image-file" type="file" accept="image/svg+xml, image/jpeg, image/gif, image/png">
             </div>
         </div>
     </div>
 </div>
 
+<textarea id="description" placeholder="" data-maintext="" readonly></textarea>
 
-
-
-<textarea id="description" placeholder="" data-maintext="" readonly> </textarea>
+<script type="module" src="view.js"></script>
 
 </body>
 </html>

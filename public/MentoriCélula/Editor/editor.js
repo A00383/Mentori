@@ -361,18 +361,23 @@ if (mainimageinput && mainimagesContainer) {
     });
 }
 
-// main remove toggle
+// main remove toggle — uses applyEraserCursorToImage for reliability
 if (mainremoveBtn) {
     mainremoveBtn.addEventListener("click", (ev) => {
         ev.stopPropagation();
         mainimageremoveMode = !mainimageremoveMode;
 
-        updateRemovableClass('.main-image', mainimageremoveMode);
+        // apply/remove eraser cursor (inline) for all existing main images
+        document.querySelectorAll('.main-image').forEach(img => {
+            // make sure handlers exist
+            attachMainImageBehavior(img);
+            applyEraserCursorToImage(img, mainimageremoveMode);
+        });
 
         mainremoveBtn.textContent = mainimageremoveMode ? "Cancelar quitar" : "Quitar imagen";
 
-        // If turning off remove mode, ensure no eraser is stuck on body
-        if (!mainimageremoveMode) removeBodyEraser();
+        // ensure no stuck eraser if turned off
+        if (!mainimageremoveMode) document.body.classList.remove('eraser-cursor');
 
         console.log('mainimageremoveMode:', mainimageremoveMode);
     });

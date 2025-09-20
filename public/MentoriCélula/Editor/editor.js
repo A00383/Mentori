@@ -381,6 +381,16 @@ window.addEventListener('DOMContentLoaded', async () => {
         window.location.href = `/MentoriCélula/Viewer/view.html?id=${docId}`;
     }
 });
+//---------------------
+// Return home button
+//---------------------
+
+const returnHomeBtn = document.getElementById("return-homebtn");
+
+returnHomeBtn.addEventListener("click", () => {
+    window.location.href = "/index.html";
+});
+
 
 // -----------------------------
 // Organelles hover + click names

@@ -351,25 +351,18 @@ if (mainimageinput && mainimagesContainer) {
     });
 }
 
-// main remove toggle (with eraser cursor + click delete)
+// main remove toggle
 if (mainremoveBtn) {
     mainremoveBtn.addEventListener("click", (ev) => {
         ev.stopPropagation();
         mainimageremoveMode = !mainimageremoveMode;
 
-        document.querySelectorAll(".main-image").forEach(img => {
-            img.classList.toggle("removable", mainimageremoveMode);
-
-            // clicking a removable image deletes it
-            img.onclick = (e) => {
-                if (mainimageremoveMode) {
-                    e.stopPropagation();
-                    img.remove();
-                }
-            };
-        });
+        updateRemovableClass('.main-image', mainimageremoveMode);
 
         mainremoveBtn.textContent = mainimageremoveMode ? "Cancelar quitar" : "Quitar imagen";
+
+        // If turning off remove mode, ensure no eraser is stuck on body
+        if (!mainimageremoveMode) clearBodyEraser();
     });
 }
 

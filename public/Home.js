@@ -125,9 +125,9 @@ createBtn.addEventListener("click", async () => {
     const { data: { session } } = await supabase.auth.getSession();
     const user = session?.user;
 
-    const newId = nanoid();
-
     if (user) {
+        // User is logged in → create a new document in Supabase
+        const newId = nanoid();
         const { data: doc, error } = await supabase
             .from("documents")
             .insert([{ id: newId, creator: user.email, content: "" }])
@@ -141,6 +141,7 @@ createBtn.addEventListener("click", async () => {
 
         window.location.href = `/MentoriCélula/Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
     } else {
-        window.location.href = `/MentoriCélula/Editor/editor.html?id=${encodeURIComponent(newId)}&guest=true`;
+        // Guest user → go directly to static editor
+        window.location.href = "https://mentorigroup.com/MentoriC%C3%A9lula/Editor/editor.html";
     }
 });

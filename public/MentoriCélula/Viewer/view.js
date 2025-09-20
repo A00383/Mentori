@@ -251,16 +251,6 @@ async function createDocument(editorContent) {
     return id;
 }
 
-async function updateDocument(id, editorContent) {
-    const now = new Date().toISOString();
-    const { error } = await supabase.from('documents')
-        .update({ content: editorContent, updated_at: now })
-        .eq('id', id);
-
-    if (error) throw error;
-    return true;
-}
-
 async function loadDocumentById(id) {
     const { data, error } = await supabase.from('documents')
         .select('*')
@@ -299,33 +289,10 @@ copyBtn.addEventListener('click', async () => {
 
 
 // -----------------------------
-// Save online
+// Save online (disabled for now)
 // -----------------------------
-saveonlinebutton.addEventListener("click", async () => {
-    const content = gatherEditorContent();
-    const docId = new URLSearchParams(window.location.search).get("id");
-
-    try {
-        const user = await getCurrentUser();
-        if (!user) return alert("You must be logged in to save online.");
-
-        if (docId) {
-            const doc = await loadDocumentById(docId);
-            if (!doc) return alert("Document not found.");
-            if (doc.creator !== user.email) return alert("You are not the creator of this document.");
-
-            await updateDocument(docId, content);
-            alert("Document saved successfully!");
-        } else {
-            const newId = await createDocument(content);
-            alert("New document created successfully!");
-            // Redirect using absolute path from root
-            window.location.href = `/MentoriCélula/Editor/editor.html?id=${newId}`;
-        }
-    } catch (err) {
-        console.error(err);
-        alert("Error saving document: " + err.message);
-    }
+saveonlinebutton.addEventListener("click", () => {
+    alert("Online save is not available yet.");
 });
 
 // -----------------------------
@@ -350,7 +317,7 @@ loadInput.addEventListener("change", (e) => {
 });
 
 // -----------------------------
-// Auto-load dataset & enforce creator-only access
+// Auto-load dataset (always load from DB)
 // -----------------------------
 window.addEventListener('DOMContentLoaded', async () => {
     const docId = new URLSearchParams(window.location.search).get("id");
@@ -360,25 +327,15 @@ window.addEventListener('DOMContentLoaded', async () => {
         const doc = await loadDocumentById(docId);
         if (!doc) {
             alert("Document not found.");
-            window.location.href = "/MentoriCélula/Viewer/view.html";
             return;
         }
 
-        const user = await getCurrentUser();
-
-        if (!user || user.email !== doc.creator) {
-            alert("You are not authorized to edit this document. Redirecting to viewer...");
-            window.location.href = `/MentoriCélula/Viewer/view.html?id=${docId}`;
-            return;
-        }
-
-        // Populate editor with content
+        // Always populate editor with content if it exists
         if (doc.content) populateEditorWithContent(doc.content);
 
     } catch (err) {
         console.error("Failed to load document:", err);
-        alert("Error loading document. Redirecting to viewer...");
-        window.location.href = `/MentoriCélula/Viewer/view.html?id=${docId}`;
+        alert("Error loading document.");
     }
 });
 //---------------------

@@ -411,3 +411,11 @@ setupOrganelName(microtubulos, "Microtúbulos");
 setupOrganelName(mitocondrias, "Mitocondrias");
 setupOrganelName(lisosomas, "Lisosomas");
 setupOrganelName(aparatodegolgi, "Aparato de Golgi");
+
+// Activate remove mode
+removeMode = true;
+document.body.classList.add("eraser-cursor");
+
+// Deactivate remove mode
+removeMode = false;
+document.body.classList.remove("eraser-cursor");

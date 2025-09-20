@@ -1,6 +1,11 @@
-// editor.js (rewritten)
 // -----------------------------
-// DOM Elements (defensive lookups)
+// Imports
+// -----------------------------
+import { supabase } from '/supabase.js';
+import { nanoid } from 'https://cdn.jsdelivr.net/npm/nanoid/nanoid.js';
+
+// -----------------------------
+// DOM Elements
 // -----------------------------
 const popup = document.getElementById('pop-up');
 const closepopup = document.getElementById('close-pop-up');
@@ -21,8 +26,11 @@ const mainremoveBtn = document.getElementById("main-image-remove");
 const mainimagesContainer = document.getElementById("main-image-images");
 const popupname = document.getElementById('pop-up-name');
 const mainorganelname = document.getElementById('organelo');
+const copyBtn = document.getElementById('copybtn');
+const returnHomeBtn = document.getElementById("return-homebtn");
+const signInBtn = document.getElementById("sign-in");
 
-// Organelles (may be null if not present)
+// Organelles
 const membranacelular = document.getElementById('membrana celular');
 const citoplasma = document.getElementById('citoplasma');
 const nucleolo = document.getElementById('nucleolo');
@@ -42,99 +50,70 @@ let popupimageremovemode = false;
 let mainimageremoveMode = false;
 
 // -----------------------------
-// Helpers: cursor + mode management
+// Cursor + remove mode helpers
 // -----------------------------
 function updateCursor() {
-    // Show eraser if any remove mode active
     if (popupimageremovemode || mainimageremoveMode) {
         document.body.classList.add('eraser-cursor');
     } else {
         document.body.classList.remove('eraser-cursor');
     }
 }
-
 function exitAllRemoveModes() {
     popupimageremovemode = false;
     mainimageremoveMode = false;
-
-    // Remove 'removable' class from any images
     document.querySelectorAll('.pop-up-image.removable').forEach(img => img.classList.remove('removable'));
     document.querySelectorAll('.main-image.removable').forEach(img => img.classList.remove('removable'));
-
-    // Reset remove buttons text if they exist
     if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
     if (mainremoveBtn) mainremoveBtn.textContent = 'Quitar imagen';
-
     updateCursor();
 }
-
-// If user clicks anywhere that's NOT an image, cancel remove modes.
-// We use capture=false (bubbling) so clicks on images are seen first by image handlers.
 document.addEventListener('click', (e) => {
     const target = e.target;
-    const clickedMainImage = target.classList && target.classList.contains('main-image');
-    const clickedPopupImage = target.classList && target.classList.contains('pop-up-image');
-    const clickedMainRemoveBtn = target === mainremoveBtn;
-    const clickedPopupRemoveBtn = target === popupimageremove;
-
-    // If a remove mode is active but click wasn't on an image or the remove buttons -> exit modes
+    const clickedMainImage = target.classList?.contains('main-image');
+    const clickedPopupImage = target.classList?.contains('pop-up-image');
     if ((popupimageremovemode || mainimageremoveMode) &&
-        !clickedMainImage && !clickedPopupImage && !clickedMainRemoveBtn && !clickedPopupRemoveBtn) {
+        !clickedMainImage && !clickedPopupImage &&
+        target !== mainremoveBtn && target !== popupimageremove) {
         exitAllRemoveModes();
     }
 });
 
 // -----------------------------
-// Helper: Gather editor content
+// Gather / populate content
 // -----------------------------
 function gatherEditorContent() {
-    const savedataexport = {
+    return {
         description: document.getElementById("description")?.value || "",
         mainImages: [...(mainimagesContainer?.querySelectorAll("img") || [])].map(img => img.src),
-        organelos: []
-    };
-
-    organelos.forEach((organelo) => {
-        savedataexport.organelos.push({
+        organelos: [...organelos].map(organelo => ({
             id: organelo.id || null,
             content: organelo.dataset?.content || "",
             image: organelo.dataset?.image ? JSON.parse(organelo.dataset.image) : [],
-        });
-    });
-
-    return savedataexport;
+        }))
+    };
 }
-
-// -----------------------------
-// Helper: Populate editor with content
-// -----------------------------
 function populateEditorWithContent(data) {
     if (!data) return;
     const descElem = document.getElementById("description");
     if (descElem) descElem.value = data.description || "";
-
-    if (!mainimagesContainer) return;
-    mainimagesContainer.innerHTML = "";
-    (data.mainImages || []).forEach(src => {
-        const img = document.createElement("img");
-        img.src = src;
-        img.classList.add("main-image");
-        img.dataset.src = src;
-
-        // clicking an image removes it only when mainimageremoveMode is active
-        img.addEventListener("click", (ev) => {
-            if (mainimageremoveMode) {
-                ev.stopPropagation();
-                mainimagesContainer.removeChild(img);
-            }
+    if (mainimagesContainer) {
+        mainimagesContainer.innerHTML = "";
+        (data.mainImages || []).forEach(src => {
+            const img = document.createElement("img");
+            img.src = src;
+            img.classList.add("main-image");
+            img.addEventListener("click", (ev) => {
+                if (mainimageremoveMode) {
+                    ev.stopPropagation();
+                    mainimagesContainer.removeChild(img);
+                }
+            });
+            mainimagesContainer.appendChild(img);
         });
-
-        mainimagesContainer.appendChild(img);
-    });
-
+    }
     (data.organelos || []).forEach((item, index) => {
-        let target = item.id ? document.getElementById(item.id) : null;
-        if (!target && organelos[index]) target = organelos[index];
+        let target = item.id ? document.getElementById(item.id) : organelos[index];
         if (target) {
             target.dataset.content = item.content || "";
             target.dataset.image = JSON.stringify(item.image || []);
@@ -143,32 +122,21 @@ function populateEditorWithContent(data) {
 }
 
 // -----------------------------
-// Pop-up logic
+// Pop-up logic (open / save / close)
 // -----------------------------
-if (organelos && organelos.length) {
+if (organelos.length) {
     organelos.forEach(selectedorganel => {
-        selectedorganel.addEventListener('click', (e) => {
-            // Opening a popup should cancel main-image remove mode so cursor doesn't persist
-            if (mainimageremoveMode) {
-                mainimageremoveMode = false;
-                document.querySelectorAll('.main-image.removable').forEach(i => i.classList.remove('removable'));
-                if (mainremoveBtn) mainremoveBtn.textContent = 'Quitar imagen';
-                updateCursor();
-            }
-
+        selectedorganel.addEventListener('click', () => {
+            if (mainimageremoveMode) exitAllRemoveModes();
             currentogranel = selectedorganel;
-            popupmessage && (popupmessage.value = selectedorganel.dataset?.content || "");
-            if (popupimagecontainer) popupimagecontainer.innerHTML = "";
-
-            if (selectedorganel.dataset?.image && popupimagecontainer) {
+            if (popupmessage) popupmessage.value = selectedorganel.dataset?.content || "";
+            if (popupimagecontainer) {
+                popupimagecontainer.innerHTML = "";
                 try {
-                    const imgs = JSON.parse(selectedorganel.dataset.image || "[]");
-                    imgs.forEach(src => {
+                    (JSON.parse(selectedorganel.dataset.image || "[]")).forEach(src => {
                         const popupimg = document.createElement("img");
                         popupimg.src = src;
                         popupimg.classList.add("pop-up-image");
-
-                        // clicking a popup image removes it only when popupimageremovemode is active
                         popupimg.addEventListener("click", (ev) => {
                             if (popupimageremovemode) {
                                 ev.stopPropagation();
@@ -177,156 +145,98 @@ if (organelos && organelos.length) {
                         });
                         popupimagecontainer.appendChild(popupimg);
                     });
-                } catch (err) {
-                    console.warn("Failed to parse organelle images:", err);
-                }
+                } catch {}
             }
-
-            if (popup) popup.classList.add('active');
+            popup?.classList.add('active');
         });
     });
 }
-
-// popup image add (if element exists)
-if (popupimageadd && popupimageinput) {
-    popupimageadd.addEventListener("click", () => popupimageinput.click());
-}
-
-// popup image input
+if (popupimageadd && popupimageinput) popupimageadd.addEventListener("click", () => popupimageinput.click());
 if (popupimageinput && popupimagecontainer) {
     popupimageinput.addEventListener("change", (e) => {
-        const popupfile = e.target.files[0];
-        if (!popupfile) return;
-
+        const file = e.target.files[0]; if (!file) return;
         const reader = new FileReader();
         reader.onload = (event) => {
-            const popupimg = document.createElement("img");
-            popupimg.src = event.target.result;
-            popupimg.classList.add("pop-up-image");
-            popupimg.dataset.image = popupimg.src;
-
-            popupimg.addEventListener("click", (ev) => {
+            const img = document.createElement("img");
+            img.src = event.target.result;
+            img.classList.add("pop-up-image");
+            img.addEventListener("click", (ev) => {
                 if (popupimageremovemode) {
                     ev.stopPropagation();
-                    popupimagecontainer.removeChild(popupimg);
+                    popupimagecontainer.removeChild(img);
                 }
             });
-
-            popupimagecontainer.appendChild(popupimg);
+            popupimagecontainer.appendChild(img);
         };
-        reader.readAsDataURL(popupfile);
+        reader.readAsDataURL(file);
         popupimageinput.value = "";
     });
 }
-
-// popup remove toggle
 if (popupimageremove) {
     popupimageremove.addEventListener("click", (ev) => {
         ev.stopPropagation();
         popupimageremovemode = !popupimageremovemode;
-
-        // toggle removable appearance
         document.querySelectorAll(".pop-up-image").forEach(img =>
-            img.classList.toggle("removable", popupimageremovemode)
-        );
-
+            img.classList.toggle("removable", popupimageremovemode));
         popupimageremove.textContent = popupimageremovemode ? "Cancelar quitar" : "Quitar imagen";
         updateCursor();
     });
 }
-
-// save popup (apply changes back to organelle)
 if (savepopup) {
     savepopup.addEventListener('click', () => {
         if (!currentogranel) return;
         currentogranel.dataset.content = popupmessage?.value || "";
-        const imgs = [...(popupimagecontainer?.querySelectorAll("img") || [])].map(img => img.src);
-        currentogranel.dataset.image = JSON.stringify(imgs);
-        // close popup and reset popup remove mode
+        currentogranel.dataset.image = JSON.stringify(
+            [...(popupimagecontainer?.querySelectorAll("img") || [])].map(img => img.src)
+        );
         popup?.classList.remove('active');
-        popupimageremovemode = false;
-        document.querySelectorAll('.pop-up-image.removable').forEach(i => i.classList.remove('removable'));
-        if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
-        updateCursor();
+        exitAllRemoveModes();
     });
 }
-
-// close popup (cancel)
-if (closepopup) {
-    closepopup.addEventListener("click", () => {
-        popup?.classList.remove('active');
-        // reset popup remove mode on close
-        popupimageremovemode = false;
-        document.querySelectorAll('.pop-up-image.removable').forEach(i => i.classList.remove('removable'));
-        if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
-        updateCursor();
-    });
-}
-
-// clicking backdrop closes popup and resets modes
-if (popup) {
-    popup.addEventListener('click', (e) => {
-        if (e.target === popup) {
-            // save content back to current organelle (keeps consistent with previous behavior)
-            if (currentogranel) {
-                currentogranel.dataset.content = popupmessage?.value || "";
-                const imgs = [...(popupimagecontainer?.querySelectorAll("img") || [])].map(img => img.src);
-                currentogranel.dataset.image = JSON.stringify(imgs);
-            }
-            popup.classList.remove('active');
-
-            // reset popup remove mode
-            popupimageremovemode = false;
-            document.querySelectorAll('.pop-up-image.removable').forEach(i => i.classList.remove('removable'));
-            if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
-            updateCursor();
+if (closepopup) closepopup.addEventListener("click", () => { popup?.classList.remove('active'); exitAllRemoveModes(); });
+if (popup) popup.addEventListener('click', (e) => {
+    if (e.target === popup) {
+        if (currentogranel) {
+            currentogranel.dataset.content = popupmessage?.value || "";
+            currentogranel.dataset.image = JSON.stringify(
+                [...(popupimagecontainer?.querySelectorAll("img") || [])].map(img => img.src)
+            );
         }
-    });
-}
+        popup.classList.remove('active');
+        exitAllRemoveModes();
+    }
+});
 
 // -----------------------------
-// Main images logic
+// Main image logic
 // -----------------------------
-if (mainaddBtn && mainimageinput) {
-    mainaddBtn.addEventListener("click", () => mainimageinput.click());
-}
-
+if (mainaddBtn && mainimageinput) mainaddBtn.addEventListener("click", () => mainimageinput.click());
 if (mainimageinput && mainimagesContainer) {
     mainimageinput.addEventListener("change", (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
+        const file = e.target.files[0]; if (!file) return;
         const reader = new FileReader();
         reader.onload = (event) => {
             const img = document.createElement("img");
             img.src = event.target.result;
             img.classList.add("main-image");
-            img.dataset.src = img.src;
-
             img.addEventListener("click", (ev) => {
                 if (mainimageremoveMode) {
                     ev.stopPropagation();
                     mainimagesContainer.removeChild(img);
                 }
             });
-
             mainimagesContainer.appendChild(img);
         };
         reader.readAsDataURL(file);
         mainimageinput.value = "";
     });
 }
-
-// main remove toggle
 if (mainremoveBtn) {
     mainremoveBtn.addEventListener("click", (ev) => {
         ev.stopPropagation();
         mainimageremoveMode = !mainimageremoveMode;
-
         document.querySelectorAll(".main-image").forEach(img =>
-            img.classList.toggle("removable", mainimageremoveMode)
-        );
-
+            img.classList.toggle("removable", mainimageremoveMode));
         mainremoveBtn.textContent = mainimageremoveMode ? "Cancelar quitar" : "Quitar imagen";
         updateCursor();
     });
@@ -340,85 +250,54 @@ if (savebtn) {
         const content = gatherEditorContent();
         const blob = new Blob([JSON.stringify(content, null, 2)], { type: "text/plain" });
         const url = URL.createObjectURL(blob);
-
         const a = document.createElement("a");
-        a.href = url;
-        a.download = "datasets.txt";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        a.href = url; a.download = "datasets.txt";
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(url);
     });
 }
 
 // -----------------------------
-// Supabase Online Save & Load
+// Supabase helpers
 // -----------------------------
-import { supabase } from '/supabase.js';
-import { nanoid } from 'https://cdn.jsdelivr.net/npm/nanoid/nanoid.js';
-
 async function getCurrentUser() {
     const { data } = await supabase.auth.getSession();
     return data?.session?.user ?? null;
 }
-
 async function createDocument(editorContent) {
     const user = await getCurrentUser();
     if (!user) throw new Error('Must be logged-in to save document');
-
     const id = nanoid();
     const now = new Date().toISOString();
     const { error } = await supabase.from('documents').insert({
-        id,
-        creator: user.email,
-        created_at: now,
-        updated_at: now,
-        content: editorContent
+        id, creator: user.email, created_at: now, updated_at: now, content: editorContent
     });
-
     if (error) throw error;
     return id;
 }
-
 async function updateDocument(id, editorContent) {
     const now = new Date().toISOString();
     const { error } = await supabase.from('documents')
-        .update({ content: editorContent, updated_at: now })
-        .eq('id', id);
-
+        .update({ content: editorContent, updated_at: now }).eq('id', id);
     if (error) throw error;
     return true;
 }
-
 async function loadDocumentById(id) {
-    const { data, error } = await supabase.from('documents')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
-
+    const { data, error } = await supabase.from('documents').select('*').eq('id', id).maybeSingle();
     if (error) throw error;
     return data;
 }
 
-// ------------------------------
+// -----------------------------
 // Copy Button
-// ------------------------------
-const copyBtn = document.getElementById('copybtn');
+// -----------------------------
 if (copyBtn) {
     copyBtn.addEventListener('click', async () => {
-        const content = gatherEditorContent(); // get current editor content
+        const content = gatherEditorContent();
         const user = await getCurrentUser();
-
-        if (!user) {
-            alert('You must be signed in to copy this document.');
-            return;
-        }
-
+        if (!user) return alert('You must be signed in to copy this document.');
         try {
-            // Create new document with same content
             const newId = await createDocument(content);
-
-            // Open new editor window with new document
             window.open(`/MentoriCélula/Editor/editor.html?id=${newId}`, '_blank');
         } catch (err) {
             console.error(err);
@@ -428,28 +307,24 @@ if (copyBtn) {
 }
 
 // -----------------------------
-// Save online (kept, but will error if not implemented server-side)
+// Save Online
 // -----------------------------
 if (saveonlinebutton) {
     saveonlinebutton.addEventListener("click", async () => {
         const content = gatherEditorContent();
         const docId = new URLSearchParams(window.location.search).get("id");
-
         try {
             const user = await getCurrentUser();
             if (!user) return alert("You must be logged in to save online.");
-
             if (docId) {
                 const doc = await loadDocumentById(docId);
                 if (!doc) return alert("Document not found.");
                 if (doc.creator !== user.email) return alert("You are not the creator of this document.");
-
                 await updateDocument(docId, content);
                 alert("Document saved successfully!");
             } else {
                 const newId = await createDocument(content);
                 alert("New document created successfully!");
-                // Redirect using absolute path from root
                 window.location.href = `/MentoriCélula/Editor/editor.html?id=${newId}`;
             }
         } catch (err) {
@@ -460,13 +335,12 @@ if (saveonlinebutton) {
 }
 
 // -----------------------------
-// Load local .txt dataset
+// Load Local Dataset
 // -----------------------------
 if (loadBtn && loadInput) {
     loadBtn.addEventListener("click", () => loadInput.click());
     loadInput.addEventListener("change", (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        const file = e.target.files[0]; if (!file) return;
         const reader = new FileReader();
         reader.onload = (event) => {
             try {
@@ -483,12 +357,11 @@ if (loadBtn && loadInput) {
 }
 
 // -----------------------------
-// Auto-load dataset & enforce creator-only access
+// Auto-load dataset
 // -----------------------------
 window.addEventListener('DOMContentLoaded', async () => {
     const docId = new URLSearchParams(window.location.search).get("id");
     if (!docId) return;
-
     try {
         const doc = await loadDocumentById(docId);
         if (!doc) {
@@ -496,37 +369,27 @@ window.addEventListener('DOMContentLoaded', async () => {
             window.location.href = "/MentoriCélula/Viewer/view.html";
             return;
         }
-
         const user = await getCurrentUser();
-
         if (!user || user.email !== doc.creator) {
-            alert("You are not authorized to edit this document. Redirecting to viewer...");
+            alert("You are not authorized to edit this document. Redirecting...");
             window.location.href = `/MentoriCélula/Viewer/view.html?id=${docId}`;
             return;
         }
-
-        // Populate editor with content
         if (doc.content) populateEditorWithContent(doc.content);
-
     } catch (err) {
         console.error("Failed to load document:", err);
-        alert("Error loading document. Redirecting to viewer...");
+        alert("Error loading document. Redirecting...");
         window.location.href = `/MentoriCélula/Viewer/view.html?id=${docId}`;
     }
 });
 
-//---------------------
-// Return home button
-//---------------------
-const returnHomeBtn = document.getElementById("return-homebtn");
-if (returnHomeBtn) {
-    returnHomeBtn.addEventListener("click", () => {
-        window.location.href = "/index.html";
-    });
-}
+// -----------------------------
+// Return Home
+// -----------------------------
+if (returnHomeBtn) returnHomeBtn.addEventListener("click", () => { window.location.href = "/index.html"; });
 
 // -----------------------------
-// Organelles hover + click names
+// Organelle names hover/click
 // -----------------------------
 function setupOrganelName(organel, displayName) {
     if (!organel) return;
@@ -534,7 +397,6 @@ function setupOrganelName(organel, displayName) {
     organel.addEventListener('mouseenter', () => { if (mainorganelname) mainorganelname.textContent = displayName; });
     organel.addEventListener('mouseleave', () => { if (mainorganelname) mainorganelname.textContent = "Célula animal"; });
 }
-
 setupOrganelName(membranacelular, "Membrana celular");
 setupOrganelName(citoplasma, "Citoplasma");
 setupOrganelName(nucleolo, "Nucléolo");
@@ -545,3 +407,18 @@ setupOrganelName(microtubulos, "Microtúbulos");
 setupOrganelName(mitocondrias, "Mitocondrias");
 setupOrganelName(lisosomas, "Lisosomas");
 setupOrganelName(aparatodegolgi, "Aparato de Golgi");
+
+// -----------------------------
+// Sign In button
+// -----------------------------
+if (signInBtn) {
+    signInBtn.addEventListener("click", async () => {
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: "google",
+            options: {
+                redirectTo: `${location.origin}/MentoriCélula/Editor/editor.html`
+            }
+        });
+        if (error) console.error("Login error:", error.message);
+    });
+}

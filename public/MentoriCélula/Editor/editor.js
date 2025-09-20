@@ -1,4 +1,4 @@
-// editor.js — full rewritten file with fixes
+// editor.js — fixed, full file
 // -----------------------------
 // Top-level imports (must be at top)
 import { supabase } from '/supabase.js';
@@ -50,17 +50,18 @@ let popupimageremovemode = false;
 let mainimageremoveMode = false;
 
 // -----------------------------
-// Cursor + removable helpers
+// Helpers: cursor + removable helpers
 // -----------------------------
-// Note: we implement eraser cursor on hover (not global), and keep click-to-delete behavior.
 function updateRemovableClass(selector, state) {
     document.querySelectorAll(selector).forEach(img => {
         img.classList.toggle('removable', state);
     });
 }
 
-// Ensure any residual global eraser class removed when exiting modes
-function clearBodyEraser() {
+function addBodyEraser() {
+    document.body.classList.add('eraser-cursor');
+}
+function removeBodyEraser() {
     document.body.classList.remove('eraser-cursor');
 }
 
@@ -68,18 +69,16 @@ function exitAllRemoveModes() {
     popupimageremovemode = false;
     mainimageremoveMode = false;
 
-    // Remove 'removable' class from any images
-    document.querySelectorAll('.pop-up-image.removable').forEach(img => img.classList.remove('removable'));
-    document.querySelectorAll('.main-image.removable').forEach(img => img.classList.remove('removable'));
+    updateRemovableClass('.pop-up-image', false);
+    updateRemovableClass('.main-image', false);
 
-    // Reset remove buttons text if they exist
     if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
     if (mainremoveBtn) mainremoveBtn.textContent = 'Quitar imagen';
 
-    clearBodyEraser();
+    removeBodyEraser();
 }
 
-// Clicking outside images exits remove modes
+// If user clicks anywhere that's NOT an image, cancel remove modes.
 document.addEventListener('click', (e) => {
     const target = e.target;
     const clickedMainImage = target.classList && target.classList.contains('main-image');
@@ -96,50 +95,58 @@ document.addEventListener('click', (e) => {
 // -----------------------------
 // Helper: attach handlers to images (main & popup)
 // -----------------------------
-// We attach handlers once when the image is created/loaded. The handler checks the current mode at click/hover time.
+// Attach only once per element (guard with property)
 function attachMainImageBehavior(img) {
-    // Remove-on-click when main remove mode is active
-    img.addEventListener('click', (ev) => {
+    if (!img || img.__mainHandlersAttached) return;
+    img.__mainHandlersAttached = true;
+
+    const onClick = (ev) => {
         if (mainimageremoveMode) {
             ev.stopPropagation();
             if (img.parentElement) img.parentElement.removeChild(img);
         }
-    });
+    };
+    const onEnter = () => {
+        if (mainimageremoveMode) addBodyEraser();
+    };
+    const onLeave = () => {
+        // remove eraser when leaving image
+        removeBodyEraser();
+    };
 
-    // Hover: show eraser only while hovering and while remove-mode active
-    img.addEventListener('mouseenter', () => {
-        if (mainimageremoveMode) document.body.classList.add('eraser-cursor');
-    });
-    img.addEventListener('mouseleave', () => {
-        // On leaving any main image, clear eraser
-        clearBodyEraser();
-    });
+    img.addEventListener('click', onClick);
+    img.addEventListener('mouseenter', onEnter);
+    img.addEventListener('mouseleave', onLeave);
 }
 
 function attachPopupImageBehavior(img) {
-    // Remove-on-click when popup remove mode is active
-    img.addEventListener('click', (ev) => {
-        if (popupimageremovemode && img.parentElement) {
-            ev.stopPropagation();
-            img.parentElement.removeChild(img);
-        }
-    });
+    if (!img || img.__popupHandlersAttached) return;
+    img.__popupHandlersAttached = true;
 
-    // Hover: show eraser while popup remove mode is active
-    img.addEventListener('mouseenter', () => {
-        if (popupimageremovemode) document.body.classList.add('eraser-cursor');
-    });
-    img.addEventListener('mouseleave', () => {
-        clearBodyEraser();
-    });
+    const onClick = (ev) => {
+        if (popupimageremovemode) {
+            ev.stopPropagation();
+            if (img.parentElement) img.parentElement.removeChild(img);
+        }
+    };
+    const onEnter = () => {
+        if (popupimageremovemode) addBodyEraser();
+    };
+    const onLeave = () => {
+        removeBodyEraser();
+    };
+
+    img.addEventListener('click', onClick);
+    img.addEventListener('mouseenter', onEnter);
+    img.addEventListener('mouseleave', onLeave);
 }
 
-// Attach handlers to existing images on load (defensive)
+// Attach handlers to currently existing images (defensive)
 document.querySelectorAll('.main-image').forEach(attachMainImageBehavior);
 document.querySelectorAll('.pop-up-image').forEach(attachPopupImageBehavior);
 
 // -----------------------------
-// Helper: Gather editor content
+// Helper: Gather editor content (fixed variable naming)
 // -----------------------------
 function gatherEditorContent() {
     const savedataexport = {
@@ -148,16 +155,25 @@ function gatherEditorContent() {
         organelos: []
     };
 
-    // Ensure we iterate with the correct variable name and pull dataset fields
     Array.from(organelos).forEach((organelo) => {
+        // Use organelo variable consistently
+        const id = organelo?.id ?? (organelo ? organelo.id : null);
+        const content = organelo?.dataset?.content ?? (organelo.dataset?.content || "");
+        let imagesArray = [];
+        try {
+            if (organelo.dataset?.image) imagesArray = JSON.parse(organelo.dataset.image);
+            else if (organelo.dataset?.image === "") imagesArray = [];
+        } catch (err) {
+            imagesArray = [];
+        }
+
         savedataexport.organelos.push({
-            id: organelo?.id || (organelo ? organelo.id : null), // fallback if IDs mismatch
-            content: organelo?.dataset?.content ?? (organelo.dataset?.content || ""),
-            image: organelo?.dataset?.image ? JSON.parse(organelo.dataset.image) : (organelo.dataset?.image ? JSON.parse(organelo.dataset.image) : [])
+            id,
+            content,
+            image: imagesArray
         });
     });
 
-    // The above keeps compat with minor naming inconsistencies in different markup variants.
     return savedataexport;
 }
 
@@ -177,9 +193,7 @@ function populateEditorWithContent(data) {
             img.classList.add("main-image");
             img.dataset.src = src;
 
-            // Attach behavior for removal + hover
             attachMainImageBehavior(img);
-
             mainimagesContainer.appendChild(img);
         });
     }
@@ -205,7 +219,7 @@ if (organelos && organelos.length) {
                 mainimageremoveMode = false;
                 updateRemovableClass('.main-image', false);
                 if (mainremoveBtn) mainremoveBtn.textContent = 'Quitar imagen';
-                clearBodyEraser();
+                removeBodyEraser();
             }
 
             currentogranel = selectedorganel;
@@ -251,7 +265,6 @@ if (popupimageinput && popupimagecontainer) {
             popupimg.dataset.image = popupimg.src;
 
             attachPopupImageBehavior(popupimg);
-
             popupimagecontainer.appendChild(popupimg);
         };
         reader.readAsDataURL(popupfile);
@@ -265,11 +278,8 @@ if (popupimageremove) {
         ev.stopPropagation();
         popupimageremovemode = !popupimageremovemode;
 
-        // toggle removable appearance (class only)
         updateRemovableClass('.pop-up-image', popupimageremovemode);
-
         popupimageremove.textContent = popupimageremovemode ? "Cancelar quitar" : "Quitar imagen";
-        // we do not force global eraser — eraser appears on hover because of handlers
     });
 }
 
@@ -285,7 +295,7 @@ if (savepopup) {
         popupimageremovemode = false;
         updateRemovableClass('.pop-up-image', false);
         if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
-        clearBodyEraser();
+        removeBodyEraser();
     });
 }
 
@@ -297,7 +307,7 @@ if (closepopup) {
         popupimageremovemode = false;
         updateRemovableClass('.pop-up-image', false);
         if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
-        clearBodyEraser();
+        removeBodyEraser();
     });
 }
 
@@ -317,7 +327,7 @@ if (popup) {
             popupimageremovemode = false;
             updateRemovableClass('.pop-up-image', false);
             if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
-            clearBodyEraser();
+            removeBodyEraser();
         }
     });
 }
@@ -362,7 +372,9 @@ if (mainremoveBtn) {
         mainremoveBtn.textContent = mainimageremoveMode ? "Cancelar quitar" : "Quitar imagen";
 
         // If turning off remove mode, ensure no eraser is stuck on body
-        if (!mainimageremoveMode) clearBodyEraser();
+        if (!mainimageremoveMode) removeBodyEraser();
+
+        console.log('mainimageremoveMode:', mainimageremoveMode);
     });
 }
 
@@ -515,6 +527,18 @@ if (loadBtn && loadInput) {
 // -----------------------------
 // Auto-load dataset & enforce creator-only access
 // -----------------------------
+async function refreshSignInUI() {
+    const user = await getCurrentUser();
+    if (signInBtn) {
+        signInBtn.style.display = user ? 'none' : 'inline-block';
+    }
+}
+
+// Listen to auth state changes so UI updates instantly on sign in/out
+supabase.auth.onAuthStateChange((_event, _session) => {
+    refreshSignInUI().catch(err => console.error('refreshSignInUI error', err));
+});
+
 window.addEventListener('DOMContentLoaded', async () => {
     // Update sign-in button visibility at startup
     await refreshSignInUI();
@@ -581,20 +605,6 @@ setupOrganelName(aparatodegolgi, "Aparato de Golgi");
 // -----------------------------
 // Sign-in button handling & visibility
 // -----------------------------
-async function refreshSignInUI() {
-    const user = await getCurrentUser();
-    if (signInBtn) {
-        // Hide sign-in if logged-in, show otherwise
-        signInBtn.style.display = user ? 'none' : 'inline-block';
-    }
-}
-
-// Listen to auth state changes so UI updates instantly on sign in/out
-supabase.auth.onAuthStateChange((_event, _session) => {
-    refreshSignInUI().catch(err => console.error('refreshSignInUI error', err));
-});
-
-// Hook sign-in button to start OAuth
 if (signInBtn) {
     signInBtn.addEventListener('click', async () => {
         const { error } = await supabase.auth.signInWithOAuth({

@@ -250,9 +250,6 @@ window.addEventListener('DOMContentLoaded', async () => {
 // -----------------------------
 // Copy Button (duplicate doc)
 // -----------------------------
-// -----------------------------
-// Copy Button (duplicate doc)
-// -----------------------------
 if (copyBtn) {
     copyBtn.addEventListener('click', async () => {
         const docId = new URLSearchParams(window.location.search).get("id");
@@ -268,28 +265,29 @@ if (copyBtn) {
                 return;
             }
 
-            // Get the logged-in user
+            // Make sure user is logged in
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) {
-                alert("You must be logged in to copy this document.");
+                alert("You must be logged in to copy documents.");
                 return;
             }
 
-            // Insert the new doc linked to the current user
+            // Insert new document, keeping content but assigning current user as owner
             const { data: newDoc, error } = await supabase
                 .from("documents")
-                .insert([{
-                    content: originalDoc.content,
-                    created_at: new Date().toISOString(),
-                    owner_id: user.id   // <-- make sure your table has this column
-                }])
+                .insert([
+                    {
+                        content: originalDoc.content, // Supabase will store JSON if column is jsonb
+                        creator: user.email            // must match your table column name
+                    }
+                ])
                 .select()
                 .single();
 
             if (error) throw error;
 
             if (newDoc && newDoc.id) {
-                // Redirect to Editor for the new copy
+                // Redirect user to editor with their new document
                 window.location.href = `../Editor/editor.html?id=${encodeURIComponent(newDoc.id)}`;
             } else {
                 alert("Failed to create a copy.");

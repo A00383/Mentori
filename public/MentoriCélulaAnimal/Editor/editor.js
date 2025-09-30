@@ -649,22 +649,3 @@ setupOrganelName(microtubulos, "Microtúbulos");
 setupOrganelName(mitocondrias, "Mitocondrias");
 setupOrganelName(lisosomas, "Lisosomas");
 setupOrganelName(aparatodegolgi, "Aparato de Golgi");
-
-// -----------------------------
-// Sign-in button handling & visibility
-// -----------------------------
-if (signInBtn) {
-    signInBtn.addEventListener('click', async () => {
-        const { error } = await supabase.auth.signInWithOAuth({
-            provider: "google",
-            options: {
-                // keep redirectTo so Google redirects back into the editor
-                redirectTo: `${location.origin}/MentoriCélulaAnimal/Editor/editor.html`
-            }
-        });
-        if (error) {
-            console.error("Login error:", error);
-            alert("Login failed: " + error.message);
-        }
-    });
-}

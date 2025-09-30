@@ -127,14 +127,14 @@ document.addEventListener('click', (e) => {
     const target = e.target;
     const clickedMainImage = target.classList && target.classList.contains('main-image');
     const clickedPopupImage = target.classList && target.classList.contains('pop-up-image');
-    const clickedMainRemoveBtn = target === mainremoveBtn;
-    const clickedPopupRemoveBtn = target === popupimageremove;
 
+    // Any non-image click exits remove mode
     if ((popupimageremoveMode || mainimageremoveMode) &&
-        !clickedMainImage && !clickedPopupImage && !clickedMainRemoveBtn && !clickedPopupRemoveBtn) {
+        !clickedMainImage && !clickedPopupImage) {
         exitAllRemoveModes();
     }
 });
+
 
 // -----------------------------
 // Helper: attach handlers to images (main & popup)
@@ -144,46 +144,27 @@ function attachMainImageBehavior(img) {
     if (!img || img.__mainHandlersAttached) return;
     img.__mainHandlersAttached = true;
 
-    const onClick = (ev) => {
+    img.addEventListener('click', (ev) => {
         if (mainimageremoveMode) {
             ev.stopPropagation();
             if (img.parentElement) img.parentElement.removeChild(img);
         }
-    };
-    const onEnter = () => {
-        if (mainimageremoveMode) addBodyEraser();
-    };
-    const onLeave = () => {
-        // remove eraser when leaving image
-        removeBodyEraser();
-    };
-
-    img.addEventListener('click', onClick);
-    img.addEventListener('mouseenter', onEnter);
-    img.addEventListener('mouseleave', onLeave);
+    });
 }
+
 
 function attachPopupImageBehavior(img) {
     if (!img || img.__popupHandlersAttached) return;
     img.__popupHandlersAttached = true;
 
-    const onClick = (ev) => {
+    img.addEventListener('click', (ev) => {
         if (popupimageremoveMode) {
             ev.stopPropagation();
             if (img.parentElement) img.parentElement.removeChild(img);
         }
-    };
-    const onEnter = () => {
-        if (popupimageremoveMode) addBodyEraser();
-    };
-    const onLeave = () => {
-        removeBodyEraser();
-    };
-
-    img.addEventListener('click', onClick);
-    img.addEventListener('mouseenter', onEnter);
-    img.addEventListener('mouseleave', onLeave);
+    });
 }
+
 
 // Attach handlers to currently existing images (defensive)
 document.querySelectorAll('.main-image').forEach(attachMainImageBehavior);

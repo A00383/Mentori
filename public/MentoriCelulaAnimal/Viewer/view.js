@@ -258,6 +258,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
+import { nanoid } from "https://cdn.jsdelivr.net/npm/nanoid/nanoid.js";
+
 // -----------------------------
 // Copy Button (duplicate doc)
 // -----------------------------
@@ -282,13 +284,18 @@ if (copyBtn) {
                 return;
             }
 
+            // ✅ generate a new unique id
+            const newId = nanoid();
+
+            // ✅ clone the content safely
             const newContent = JSON.parse(JSON.stringify(originalDoc.content || {}));
 
             const { data, error } = await supabase
                 .from("documents")
                 .insert([{
-                    content: newContent,
-                    creator: user.email
+                    id: newId,
+                    creator: user.email,
+                    content: newContent
                 }])
                 .select()
                 .maybeSingle();
@@ -303,7 +310,7 @@ if (copyBtn) {
 
         } catch (err) {
             console.error("Copy failed:", err);
-            alert("Error copying document.");
+            alert("Error copying document: " + (err.message || err));
         }
     });
 }

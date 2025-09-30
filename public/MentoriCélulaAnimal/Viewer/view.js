@@ -1,4 +1,9 @@
 // -----------------------------
+// Imports
+// -----------------------------
+import { supabase } from '/supabase.js';
+
+// -----------------------------
 // DOM Elements
 // -----------------------------
 const popup = document.getElementById('pop-up');
@@ -7,7 +12,6 @@ const popupmessage = document.getElementById('pop-up-message');
 const popupimagecontainer = document.getElementById("pop-up-image-section-images");
 const popupname = document.getElementById('pop-up-name');
 const mainorganelname = document.getElementById('organelo');
-
 const organelos = document.querySelectorAll('.organelos');
 
 const savebtn = document.getElementById("savebtn");
@@ -17,15 +21,7 @@ const loadBtn = document.getElementById("loadbtn");
 const mainimagesContainer = document.getElementById("main-image-images");
 const copyBtn = document.getElementById('copybtn');
 const returnHomeBtn = document.getElementById("return-homebtn");
-
-// Elements that may not exist in Viewer (editor-only)
-const popupimageinput = document.getElementById("pop-up-image-file");
-const popupimageadd = document.getElementById("pop-up-image-add");
-const popupimageremove = document.getElementById("pop-up-image-remove");
-const mainimageinput = document.getElementById("main-image-input");
-const mainaddBtn = document.getElementById("main-image-add");
-const mainremoveBtn = document.getElementById("main-image-remove");
-const savepopup = document.getElementById('save-pop-up');
+const userDiv = document.getElementById("user");
 
 // Organelles
 const membranacelular = document.getElementById('membrana celular');
@@ -45,6 +41,62 @@ const aparatodegolgi = document.getElementById('aparato de golgi');
 let currentogranel = null;
 
 // -----------------------------
+// Auth Helpers
+// -----------------------------
+async function getCurrentUser() {
+    const { data: { user } } = await supabase.auth.getUser();
+    return user;
+}
+
+async function login() {
+    const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+            redirectTo: `${location.origin}/MentoriCélulaAnimal/Viewer/viewer.html`
+        }
+    });
+    if (error) {
+        console.error("Login error:", error.message);
+        alert("Login failed: " + error.message);
+    }
+}
+
+async function logout() {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+        console.error("Logout error:", error.message);
+        alert("Logout failed: " + error.message);
+    }
+}
+
+async function renderUser() {
+    const user = await getCurrentUser();
+    userDiv.innerHTML = "";
+
+    if (user) {
+        const emailSpan = document.createElement("span");
+        emailSpan.textContent = user.email ?? "";
+        emailSpan.classList.add("mr-2");
+
+        const logoutBtn = document.createElement("button");
+        logoutBtn.textContent = "Cerrar sesión";
+        logoutBtn.addEventListener("click", logout);
+
+        userDiv.appendChild(emailSpan);
+        userDiv.appendChild(logoutBtn);
+    } else {
+        const loginBtn = document.createElement("button");
+        loginBtn.textContent = "Iniciar sesión";
+        loginBtn.addEventListener("click", login);
+        userDiv.appendChild(loginBtn);
+    }
+}
+
+// Re-render user on auth changes
+supabase.auth.onAuthStateChange(() => renderUser());
+window.addEventListener("DOMContentLoaded", renderUser);
+
+// -----------------------------
 // Helpers
 // -----------------------------
 function gatherViewerContent() {
@@ -60,10 +112,8 @@ function gatherViewerContent() {
 }
 
 function populateViewerWithContent(data) {
-    // description
     document.getElementById("description").value = data.description || "";
 
-    // main images
     mainimagesContainer.innerHTML = "";
     (data.mainImages || []).forEach(src => {
         const img = document.createElement("img");
@@ -72,7 +122,6 @@ function populateViewerWithContent(data) {
         mainimagesContainer.appendChild(img);
     });
 
-    // organelos
     (data.organelos || []).forEach((item, index) => {
         let target = item.id ? document.getElementById(item.id) : organelos[index];
         if (target) {
@@ -133,19 +182,17 @@ if (savebtn) {
 }
 
 // -----------------------------
-// Supabase Online Save (disabled for now)
+// Supabase Online Save (disabled in Viewer)
 // -----------------------------
 if (saveonlinebutton) {
     saveonlinebutton.addEventListener("click", () => {
-        alert("Online save is not available in Viewer mode yet.");
+        alert("Online save is not available in Viewer mode.");
     });
 }
 
 // -----------------------------
 // Supabase load
 // -----------------------------
-import { supabase } from '/supabase.js';
-
 async function loadDocumentById(id) {
     const { data, error } = await supabase.from('documents')
         .select('*')
@@ -187,14 +234,12 @@ if (copyBtn) {
         }
 
         try {
-            // Get the current document
             const originalDoc = await loadDocumentById(docId);
             if (!originalDoc) {
                 alert("Document not found.");
                 return;
             }
 
-            // Create new document with same content
             const { data, error } = await supabase
                 .from("documents")
                 .insert([
@@ -208,7 +253,6 @@ if (copyBtn) {
 
             if (error) throw error;
 
-            // Redirect to the new Editor page
             if (data && data.id) {
                 window.location.href = `../Editor/editor.html?id=${encodeURIComponent(data.id)}`;
             } else {

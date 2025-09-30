@@ -140,6 +140,6 @@ createBtn.addEventListener("click", async () => {
         window.location.href = `MentoriCelulaAnimal/Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
     } else {
         // Guest user → go directly to static editor
-        window.location.href = "https://mentorigroup.com/MentoriC%C3%A9lulaAnimal/Editor/editor.html";
+        window.location.href = "https://mentorigroup.com/MentoriCelulaAnimal/Editor/editor.html";
     }
 });

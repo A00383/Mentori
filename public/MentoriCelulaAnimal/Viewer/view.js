@@ -1,15 +1,18 @@
 // -----------------------------
 // --- Handle Supabase OAuth hash ---
-if (window.location.hash.includes("access_token")) {
-    // Keep query string (?id=...) but drop the OAuth hash (#...)
-    const cleanUrl = window.location.origin + window.location.pathname + window.location.search;
-    window.history.replaceState({}, document.title, cleanUrl);
-}
-
-// -----------------------------
-// Imports
 // -----------------------------
 import { supabase } from '/supabase.js';
+
+(async () => {
+    if (window.location.hash.includes("access_token")) {
+        // Let Supabase process the OAuth hash into a session first
+        await supabase.auth.getSession();
+
+        // Then clean the URL (remove the hash but keep query string)
+        const cleanUrl = window.location.origin + window.location.pathname + window.location.search;
+        window.history.replaceState({}, document.title, cleanUrl);
+    }
+})();
 
 // -----------------------------
 // DOM Elements
@@ -52,8 +55,8 @@ let currentogranel = null;
 // Auth Helpers
 // -----------------------------
 async function getCurrentUser() {
-    const { data: { user } } = await supabase.auth.getUser();
-    return user;
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user ?? null;
 }
 
 async function login() {
@@ -75,7 +78,6 @@ async function login() {
         alert("Login failed: " + error.message);
     }
 }
-
 
 async function logout() {
     const currentParams = new URLSearchParams(window.location.search);

@@ -14,8 +14,8 @@ async function login() {
     const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-            // Make sure this EXACT path is added in Google Console Authorized Redirect URIs
-            redirectTo: `${location.origin}/MentoriCelulaAnimal/Editor/editor.html`
+            // Redirect back to the current page (homepage) after login
+            redirectTo: `${location.origin}${location.pathname}`
         }
     });
     if (error) console.error("Login error:", error.message);
@@ -140,6 +140,6 @@ createBtn.addEventListener("click", async () => {
         window.location.href = `MentoriCelulaAnimal/Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
     } else {
         // Guest user → go directly to static editor
-        window.location.href = "https://mentorigroup.com/MentoriC%C3%A9lulaAnimal/Editor/editor.html";
+        window.location.href = "https://mentorigroup.com/MentoriCelulaAnimal/Editor/editor.html";
     }
 });

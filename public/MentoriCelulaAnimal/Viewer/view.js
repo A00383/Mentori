@@ -63,14 +63,11 @@ async function login() {
     const currentParams = new URLSearchParams(window.location.search);
     const docId = currentParams.get("id"); // preserve the doc id
 
-    // Full absolute redirect URL
     const redirectUrl = `${window.location.origin}/MentoriCelulaAnimal/Viewer/view.html${docId ? `?id=${docId}` : ""}`;
 
     const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: {
-            redirectTo: redirectUrl
-        }
+        options: { redirectTo: redirectUrl }
     });
 
     if (error) {
@@ -90,7 +87,6 @@ async function logout() {
         return;
     }
 
-    // After logout, refresh back to the same page (with id preserved if any)
     window.location.href = `${location.origin}/MentoriCelulaAnimal/Viewer/view.html${docId ? `?id=${docId}` : ""}`;
 }
 
@@ -117,9 +113,14 @@ async function renderUser() {
     }
 }
 
+// ✅ Ensure session is restored before rendering
+window.addEventListener("DOMContentLoaded", async () => {
+    await supabase.auth.getSession();
+    await renderUser();
+});
+
 // Re-render user on auth changes
 supabase.auth.onAuthStateChange(() => renderUser());
-window.addEventListener("DOMContentLoaded", renderUser);
 
 // -----------------------------
 // Helpers
@@ -265,29 +266,25 @@ if (copyBtn) {
                 return;
             }
 
-            // Make sure user is logged in
-            const { data: { user } } = await supabase.auth.getUser();
+            // ✅ Use our getCurrentUser helper
+            const user = await getCurrentUser();
             if (!user) {
                 alert("You must be logged in to copy documents.");
                 return;
             }
 
-            // Insert new document, keeping content but assigning current user as owner
             const { data: newDoc, error } = await supabase
                 .from("documents")
-                .insert([
-                    {
-                        content: originalDoc.content, // Supabase will store JSON if column is jsonb
-                        creator: user.email            // must match your table column name
-                    }
-                ])
+                .insert([{
+                    content: originalDoc.content,
+                    creator: user.email
+                }])
                 .select()
                 .single();
 
             if (error) throw error;
 
             if (newDoc && newDoc.id) {
-                // Redirect user to editor with their new document
                 window.location.href = `../Editor/editor.html?id=${encodeURIComponent(newDoc.id)}`;
             } else {
                 alert("Failed to create a copy.");

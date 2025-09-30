@@ -72,17 +72,16 @@ function renderUser(user) {
     if (!userDiv) return;
     if (user) {
         userDiv.innerHTML = `
-      <span style="color:white; margin-right: 10px;">${user.email}</span>
+      <span style="color:white; margin-right: 10px;">${user.email ?? ""}</span>
       <button id="logout">Cerrar sesión</button>
     `;
         document.getElementById("logout")?.addEventListener("click", logout);
     } else {
-        userDiv.innerHTML = `
-      <button id="login">Iniciar sesión</button>
-    `;
+        userDiv.innerHTML = `<button id="login">Iniciar sesión</button>`;
         document.getElementById("login")?.addEventListener("click", login);
     }
 }
+
 
 (async () => {
     const { data: { session } } = await supabase.auth.getSession();

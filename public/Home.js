@@ -108,7 +108,7 @@ async function listUserDocs() {
 
         // Add click handler to open editor for this project
         card.addEventListener("click", () => {
-            window.location.href = `MentoriCélulaAnimal/Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
+            window.location.href = `MentoriCelulaAnimal/Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
         });
 
         // Add card to container
@@ -137,7 +137,7 @@ createBtn.addEventListener("click", async () => {
             return;
         }
 
-        window.location.href = `MentoriCélulaAnimal/Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
+        window.location.href = `MentoriCelulaAnimal/Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
     } else {
         // Guest user → go directly to static editor
         window.location.href = "https://mentorigroup.com/MentoriC%C3%A9lulaAnimal/Editor/editor.html";

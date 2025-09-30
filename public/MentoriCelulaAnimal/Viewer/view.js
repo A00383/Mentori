@@ -52,7 +52,7 @@ async function login() {
     const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-            redirectTo: `${location.origin}/MentoriCelulaAnimal/Viewer/viewer.html`
+            redirectTo: `${location.origin}/MentoriCelulaAnimal/Viewer/view.html`
         }
     });
     if (error) {

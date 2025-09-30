@@ -404,27 +404,56 @@ if (mainimageinput && mainimagesContainer) {
     });
 }
 
-// main remove toggle — uses applyEraserCursorToImage for reliability
+// -----------------------------
+// MAIN IMAGE REMOVE TOGGLE
+// -----------------------------
 if (mainremoveBtn) {
     mainremoveBtn.addEventListener("click", (ev) => {
         ev.stopPropagation();
         mainimageremoveMode = !mainimageremoveMode;
 
-        // apply/remove eraser cursor (inline) for all existing main images
-        document.querySelectorAll('.main-image').forEach(img => {
-            // make sure handlers exist
-            attachMainImageBehavior(img);
-            applyEraserCursorToImage(img, mainimageremoveMode);
-        });
+        // toggle removable class
+        updateRemovableClass('.main-image', mainimageremoveMode);
 
+        // button text
         mainremoveBtn.textContent = mainimageremoveMode ? "Cancelar quitar" : "Quitar imagen";
 
-        // ensure no stuck eraser if turned off
-        if (!mainimageremoveMode) document.body.classList.remove('eraser-cursor');
+        // eraser cursor on body
+        if (mainimageremoveMode) {
+            addBodyEraser();
+        } else {
+            removeBodyEraser();
+        }
 
         console.log('mainimageremoveMode:', mainimageremoveMode);
     });
 }
+
+// -----------------------------
+// POPUP IMAGE REMOVE TOGGLE
+// -----------------------------
+if (popupimageremove) {
+    popupimageremove.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        popupimageremoveMode = !popupimageremoveMode;
+
+        // toggle removable class
+        updateRemovableClass('.pop-up-image', popupimageremoveMode);
+
+        // button text
+        popupimageremove.textContent = popupimageremoveMode ? "Cancelar quitar" : "Quitar imagen";
+
+        // eraser cursor on body
+        if (popupimageremoveMode) {
+            addBodyEraser();
+        } else {
+            removeBodyEraser();
+        }
+
+        console.log('popupimageremoveMode:', popupimageremoveMode);
+    });
+}
+
 
 // -----------------------------
 // Local save (.txt)

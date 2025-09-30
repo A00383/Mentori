@@ -1,11 +1,15 @@
-// editor.js — fixed, full file
+// =============================
+// editor.js — full fixed version
+// =============================
+
 // -----------------------------
-// Top-level imports (must be at top)
+// Imports
+// -----------------------------
 import { supabase } from '/supabase.js';
 import { nanoid } from 'https://cdn.jsdelivr.net/npm/nanoid/nanoid.js';
 
 // -----------------------------
-// DOM Elements (defensive lookups)
+// DOM Elements
 // -----------------------------
 const popup = document.getElementById('pop-up');
 const closepopup = document.getElementById('close-pop-up');
@@ -28,9 +32,9 @@ const popupname = document.getElementById('pop-up-name');
 const mainorganelname = document.getElementById('organelo');
 const copyBtn = document.getElementById('copybtn');
 const returnHomeBtn = document.getElementById("return-homebtn");
-const signInBtn = document.getElementById("sign-in"); // your new sign-in button
+const signInBtn = document.getElementById("sign-in");
 
-// Organelles (may be null if not present)
+// Organelle nodes
 const membranacelular = document.getElementById('membrana celular');
 const citoplasma = document.getElementById('citoplasma');
 const nucleolo = document.getElementById('nucleolo');
@@ -45,145 +49,100 @@ const aparatodegolgi = document.getElementById('aparato de golgi');
 // -----------------------------
 // State
 // -----------------------------
-let currentogranel = null;
+let currentorganel = null;
 let popupimageremovemode = false;
 let mainimageremoveMode = false;
 
 // -----------------------------
-// Helpers: cursor + removable helpers
+// Helpers
 // -----------------------------
 function updateRemovableClass(selector, state) {
-    document.querySelectorAll(selector).forEach(img => {
-        img.classList.toggle('removable', state);
-    });
+    document.querySelectorAll(selector).forEach(img =>
+        img.classList.toggle('removable', state)
+    );
 }
-
-function addBodyEraser() {
-    document.body.classList.add('eraser-cursor');
-}
-function removeBodyEraser() {
-    document.body.classList.remove('eraser-cursor');
-}
+function addBodyEraser() { document.body.classList.add('eraser-cursor'); }
+function removeBodyEraser() { document.body.classList.remove('eraser-cursor'); }
 
 function exitAllRemoveModes() {
     popupimageremovemode = false;
     mainimageremoveMode = false;
-
     updateRemovableClass('.pop-up-image', false);
     updateRemovableClass('.main-image', false);
-
     if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
     if (mainremoveBtn) mainremoveBtn.textContent = 'Quitar imagen';
-
     removeBodyEraser();
 }
 
-// If user clicks anywhere that's NOT an image, cancel remove modes.
+// cancel remove modes when clicking outside
 document.addEventListener('click', (e) => {
-    const target = e.target;
-    const clickedMainImage = target.classList && target.classList.contains('main-image');
-    const clickedPopupImage = target.classList && target.classList.contains('pop-up-image');
-    const clickedMainRemoveBtn = target === mainremoveBtn;
-    const clickedPopupRemoveBtn = target === popupimageremove;
-
     if ((popupimageremovemode || mainimageremoveMode) &&
-        !clickedMainImage && !clickedPopupImage && !clickedMainRemoveBtn && !clickedPopupRemoveBtn) {
+        !e.target.classList.contains('main-image') &&
+        !e.target.classList.contains('pop-up-image') &&
+        e.target !== mainremoveBtn &&
+        e.target !== popupimageremove) {
         exitAllRemoveModes();
     }
 });
 
 // -----------------------------
-// Helper: attach handlers to images (main & popup)
+// Attach behaviors to images
 // -----------------------------
-// Attach only once per element (guard with property)
 function attachMainImageBehavior(img) {
     if (!img || img.__mainHandlersAttached) return;
     img.__mainHandlersAttached = true;
 
-    const onClick = (ev) => {
+    img.addEventListener('click', (ev) => {
         if (mainimageremoveMode) {
             ev.stopPropagation();
-            if (img.parentElement) img.parentElement.removeChild(img);
+            img.remove();
         }
-    };
-    const onEnter = () => {
+    });
+    img.addEventListener('mouseenter', () => {
         if (mainimageremoveMode) addBodyEraser();
-    };
-    const onLeave = () => {
-        // remove eraser when leaving image
-        removeBodyEraser();
-    };
-
-    img.addEventListener('click', onClick);
-    img.addEventListener('mouseenter', onEnter);
-    img.addEventListener('mouseleave', onLeave);
+    });
+    img.addEventListener('mouseleave', removeBodyEraser);
 }
 
 function attachPopupImageBehavior(img) {
     if (!img || img.__popupHandlersAttached) return;
     img.__popupHandlersAttached = true;
 
-    const onClick = (ev) => {
+    img.addEventListener('click', (ev) => {
         if (popupimageremovemode) {
             ev.stopPropagation();
-            if (img.parentElement) img.parentElement.removeChild(img);
+            img.remove();
         }
-    };
-    const onEnter = () => {
+    });
+    img.addEventListener('mouseenter', () => {
         if (popupimageremovemode) addBodyEraser();
-    };
-    const onLeave = () => {
-        removeBodyEraser();
-    };
-
-    img.addEventListener('click', onClick);
-    img.addEventListener('mouseenter', onEnter);
-    img.addEventListener('mouseleave', onLeave);
+    });
+    img.addEventListener('mouseleave', removeBodyEraser);
 }
 
-// Attach handlers to currently existing images (defensive)
+// initialize handlers
 document.querySelectorAll('.main-image').forEach(attachMainImageBehavior);
 document.querySelectorAll('.pop-up-image').forEach(attachPopupImageBehavior);
 
 // -----------------------------
-// Helper: Gather editor content (fixed variable naming)
+// Gather & Populate editor content
 // -----------------------------
 function gatherEditorContent() {
-    const savedataexport = {
+    return {
         description: document.getElementById("description")?.value || "",
         mainImages: [...(mainimagesContainer?.querySelectorAll("img") || [])].map(img => img.src),
-        organelos: []
+        organelos: Array.from(organelos).map(o => ({
+            id: o?.id ?? null,
+            content: o?.dataset?.content || "",
+            image: safeParse(o?.dataset?.image, [])
+        }))
     };
-
-    Array.from(organelos).forEach((organelo) => {
-        // Use organelo variable consistently
-        const id = organelo?.id ?? (organelo ? organelo.id : null);
-        const content = organelo?.dataset?.content ?? (organelo.dataset?.content || "");
-        let imagesArray = [];
-        try {
-            if (organelo.dataset?.image) imagesArray = JSON.parse(organelo.dataset.image);
-            else if (organelo.dataset?.image === "") imagesArray = [];
-        } catch (err) {
-            imagesArray = [];
-        }
-
-        savedataexport.organelos.push({
-            id,
-            content,
-            image: imagesArray
-        });
-    });
-
-    return savedataexport;
 }
-
-// -----------------------------
-// Helper: Populate editor with content
-// -----------------------------
 function populateEditorWithContent(data) {
     if (!data) return;
-    const descElem = document.getElementById("description");
-    if (descElem) descElem.value = data.description || "";
+
+    const desc = document.getElementById("description");
+    if (desc) desc.value = data.description || "";
 
     if (mainimagesContainer) {
         mainimagesContainer.innerHTML = "";
@@ -191,195 +150,136 @@ function populateEditorWithContent(data) {
             const img = document.createElement("img");
             img.src = src;
             img.classList.add("main-image");
-            img.dataset.src = src;
-
             attachMainImageBehavior(img);
             mainimagesContainer.appendChild(img);
         });
     }
 
-    (data.organelos || []).forEach((item, index) => {
-        let target = item.id ? document.getElementById(item.id) : null;
-        if (!target && organelos[index]) target = organelos[index];
+    (data.organelos || []).forEach((item, idx) => {
+        const target = document.getElementById(item.id) || organelos[idx];
         if (target) {
             target.dataset.content = item.content || "";
             target.dataset.image = JSON.stringify(item.image || []);
         }
     });
 }
+function safeParse(str, fallback) {
+    try { return JSON.parse(str || ""); }
+    catch { return fallback; }
+}
 
 // -----------------------------
-// Pop-up logic (open / add images / save / close)
+// Pop-up logic
 // -----------------------------
-if (organelos && organelos.length) {
-    organelos.forEach(selectedorganel => {
-        selectedorganel.addEventListener('click', (e) => {
-            // Opening a popup should cancel main-image remove mode
-            if (mainimageremoveMode) {
-                mainimageremoveMode = false;
-                updateRemovableClass('.main-image', false);
-                if (mainremoveBtn) mainremoveBtn.textContent = 'Quitar imagen';
-                removeBodyEraser();
+if (organelos) {
+    organelos.forEach(organel => {
+        organel.addEventListener('click', () => {
+            if (mainimageremoveMode) exitAllRemoveModes();
+
+            currentorganel = organel;
+            if (popupmessage) popupmessage.value = organel.dataset?.content || "";
+            if (popupimagecontainer) {
+                popupimagecontainer.innerHTML = "";
+                safeParse(organel.dataset?.image, []).forEach(src => {
+                    const img = document.createElement("img");
+                    img.src = src;
+                    img.classList.add("pop-up-image");
+                    attachPopupImageBehavior(img);
+                    popupimagecontainer.appendChild(img);
+                });
             }
-
-            currentogranel = selectedorganel;
-            if (popupmessage) popupmessage.value = selectedorganel.dataset?.content || "";
-            if (popupimagecontainer) popupimagecontainer.innerHTML = "";
-
-            if (selectedorganel.dataset?.image && popupimagecontainer) {
-                try {
-                    const imgs = JSON.parse(selectedorganel.dataset.image || "[]");
-                    imgs.forEach(src => {
-                        const popupimg = document.createElement("img");
-                        popupimg.src = src;
-                        popupimg.classList.add("pop-up-image");
-                        attachPopupImageBehavior(popupimg);
-                        popupimagecontainer.appendChild(popupimg);
-                    });
-                } catch (err) {
-                    console.warn("Failed to parse organelle images:", err);
-                }
-            }
-
-            if (popup) popup.classList.add('active');
+            popup?.classList.add('active');
         });
     });
 }
-
-// popup image add (if element exists)
 if (popupimageadd && popupimageinput) {
     popupimageadd.addEventListener("click", () => popupimageinput.click());
 }
-
-// popup image input (file -> dataURL -> image element)
-if (popupimageinput && popupimagecontainer) {
+if (popupimageinput) {
     popupimageinput.addEventListener("change", (e) => {
-        const popupfile = e.target.files[0];
-        if (!popupfile) return;
-
+        const file = e.target.files[0];
+        if (!file) return;
         const reader = new FileReader();
-        reader.onload = (event) => {
-            const popupimg = document.createElement("img");
-            popupimg.src = event.target.result;
-            popupimg.classList.add("pop-up-image");
-            popupimg.dataset.image = popupimg.src;
-
-            attachPopupImageBehavior(popupimg);
-            popupimagecontainer.appendChild(popupimg);
+        reader.onload = (evt) => {
+            const img = document.createElement("img");
+            img.src = evt.target.result;
+            img.classList.add("pop-up-image");
+            attachPopupImageBehavior(img);
+            popupimagecontainer?.appendChild(img);
         };
-        reader.readAsDataURL(popupfile);
+        reader.readAsDataURL(file);
         popupimageinput.value = "";
     });
 }
-
-// popup remove toggle
 if (popupimageremove) {
     popupimageremove.addEventListener("click", (ev) => {
         ev.stopPropagation();
         popupimageremovemode = !popupimageremovemode;
-
         updateRemovableClass('.pop-up-image', popupimageremovemode);
         popupimageremove.textContent = popupimageremovemode ? "Cancelar quitar" : "Quitar imagen";
     });
 }
-
-// save popup (apply changes back to organelle)
 if (savepopup) {
     savepopup.addEventListener('click', () => {
-        if (!currentogranel) return;
-        currentogranel.dataset.content = popupmessage?.value || "";
-        const imgs = [...(popupimagecontainer?.querySelectorAll("img") || [])].map(img => img.src);
-        currentogranel.dataset.image = JSON.stringify(imgs);
-        // close popup and reset popup remove mode
+        if (!currentorganel) return;
+        currentorganel.dataset.content = popupmessage?.value || "";
+        currentorganel.dataset.image = JSON.stringify(
+            [...(popupimagecontainer?.querySelectorAll("img") || [])].map(img => img.src)
+        );
         popup?.classList.remove('active');
-        popupimageremovemode = false;
-        updateRemovableClass('.pop-up-image', false);
-        if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
-        removeBodyEraser();
+        exitAllRemoveModes();
     });
 }
-
-// close popup (cancel)
 if (closepopup) {
     closepopup.addEventListener("click", () => {
         popup?.classList.remove('active');
-        // reset popup remove mode on close
-        popupimageremovemode = false;
-        updateRemovableClass('.pop-up-image', false);
-        if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
-        removeBodyEraser();
+        exitAllRemoveModes();
     });
 }
-
-// clicking backdrop closes popup and resets modes
 if (popup) {
     popup.addEventListener('click', (e) => {
         if (e.target === popup) {
-            // save content back to current organelle (keeps consistent with previous behavior)
-            if (currentogranel) {
-                currentogranel.dataset.content = popupmessage?.value || "";
-                const imgs = [...(popupimagecontainer?.querySelectorAll("img") || [])].map(img => img.src);
-                currentogranel.dataset.image = JSON.stringify(imgs);
+            if (currentorganel) {
+                currentorganel.dataset.content = popupmessage?.value || "";
+                currentorganel.dataset.image = JSON.stringify(
+                    [...(popupimagecontainer?.querySelectorAll("img") || [])].map(img => img.src)
+                );
             }
             popup.classList.remove('active');
-
-            // reset popup remove mode
-            popupimageremovemode = false;
-            updateRemovableClass('.pop-up-image', false);
-            if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
-            removeBodyEraser();
+            exitAllRemoveModes();
         }
     });
 }
 
 // -----------------------------
-// Main images logic (add / remove toggle)
+// Main images logic
 // -----------------------------
 if (mainaddBtn && mainimageinput) {
     mainaddBtn.addEventListener("click", () => mainimageinput.click());
 }
-
-if (mainimageinput && mainimagesContainer) {
+if (mainimageinput) {
     mainimageinput.addEventListener("change", (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
         const reader = new FileReader();
-        reader.onload = (event) => {
+        reader.onload = (evt) => {
             const img = document.createElement("img");
-            img.src = event.target.result;
+            img.src = evt.target.result;
             img.classList.add("main-image");
-            img.dataset.src = img.src;
-
-            // Attach removal + hover handlers (safe: these handlers check the mode at runtime)
             attachMainImageBehavior(img);
-
-            mainimagesContainer.appendChild(img);
+            mainimagesContainer?.appendChild(img);
         };
         reader.readAsDataURL(file);
         mainimageinput.value = "";
     });
 }
-
-// main remove toggle — uses applyEraserCursorToImage for reliability
 if (mainremoveBtn) {
     mainremoveBtn.addEventListener("click", (ev) => {
         ev.stopPropagation();
         mainimageremoveMode = !mainimageremoveMode;
-
-        // apply/remove eraser cursor (inline) for all existing main images
-        document.querySelectorAll('.main-image').forEach(img => {
-            // make sure handlers exist
-            attachMainImageBehavior(img);
-            applyEraserCursorToImage(img, mainimageremoveMode);
-        });
-
+        updateRemovableClass('.main-image', mainimageremoveMode);
         mainremoveBtn.textContent = mainimageremoveMode ? "Cancelar quitar" : "Quitar imagen";
-
-        // ensure no stuck eraser if turned off
-        if (!mainimageremoveMode) document.body.classList.remove('eraser-cursor');
-
-        console.log('mainimageremoveMode:', mainimageremoveMode);
+        if (!mainimageremoveMode) removeBodyEraser();
     });
 }
 
@@ -388,126 +288,97 @@ if (mainremoveBtn) {
 // -----------------------------
 if (savebtn) {
     savebtn.addEventListener("click", () => {
-        const content = gatherEditorContent();
-        const blob = new Blob([JSON.stringify(content, null, 2)], { type: "text/plain" });
+        const blob = new Blob([JSON.stringify(gatherEditorContent(), null, 2)], { type: "text/plain" });
         const url = URL.createObjectURL(blob);
-
         const a = document.createElement("a");
-        a.href = url;
-        a.download = "datasets.txt";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        a.href = url; a.download = "datasets.txt";
+        document.body.appendChild(a); a.click(); a.remove();
         URL.revokeObjectURL(url);
     });
 }
 
 // -----------------------------
-// Supabase Online Save & Load helpers
+// Supabase helpers
 // -----------------------------
 async function getCurrentUser() {
     const { data } = await supabase.auth.getSession();
     return data?.session?.user ?? null;
 }
-
-async function createDocument(editorContent) {
+async function createDocument(content) {
     const user = await getCurrentUser();
-    if (!user) throw new Error('Must be logged-in to save document');
-
+    if (!user) throw new Error("Must be logged in");
     const id = nanoid();
     const now = new Date().toISOString();
     const { error } = await supabase.from('documents').insert({
-        id,
-        creator: user.email,
-        created_at: now,
-        updated_at: now,
-        content: editorContent
+        id, creator: user.email, created_at: now, updated_at: now, content
     });
-
     if (error) throw error;
     return id;
 }
-
-async function updateDocument(id, editorContent) {
+async function updateDocument(id, content) {
     const now = new Date().toISOString();
     const { error } = await supabase.from('documents')
-        .update({ content: editorContent, updated_at: now })
-        .eq('id', id);
-
+        .update({ content, updated_at: now }).eq('id', id);
     if (error) throw error;
-    return true;
 }
-
 async function loadDocumentById(id) {
-    const { data, error } = await supabase.from('documents')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
-
+    const { data, error } = await supabase.from('documents').select('*').eq('id', id).maybeSingle();
     if (error) throw error;
     return data;
 }
 
-// ------------------------------
-// Copy Button
-// ------------------------------
+// -----------------------------
+// Copy button
+// -----------------------------
 if (copyBtn) {
     copyBtn.addEventListener('click', async () => {
-        const content = gatherEditorContent(); // get current editor content
-        const user = await getCurrentUser();
-
-        if (!user) {
-            alert('You must be signed in to copy this document.');
-            return;
-        }
-
         try {
-            // Create new document with same content
-            const newId = await createDocument(content);
-
-            // Open new editor window with new document
-            window.open(`/MentoriCélulaAnimal/Editor/editor.html?id=${newId}`, '_blank');
+            const user = await getCurrentUser();
+            if (!user) return alert("You must be logged in to copy.");
+            const newId = await createDocument(gatherEditorContent());
+            window.open(`/MentoriCélulaAnimal/Editor/editor.html?id=${newId}`, "_blank");
         } catch (err) {
             console.error(err);
-            alert('Failed to copy document: ' + err.message);
+            alert("Failed to copy: " + err.message);
         }
     });
 }
 
 // -----------------------------
-// Save online (create or update)
+// Save online
 // -----------------------------
 if (saveonlinebutton) {
     saveonlinebutton.addEventListener("click", async () => {
-        const content = gatherEditorContent();
-        const docId = new URLSearchParams(window.location.search).get("id");
-
         try {
             const user = await getCurrentUser();
             if (!user) return alert("You must be logged in to save online.");
+            const docId = new URLSearchParams(window.location.search).get("id");
+            const content = gatherEditorContent();
 
             if (docId) {
                 const doc = await loadDocumentById(docId);
                 if (!doc) return alert("Document not found.");
-                if (doc.creator !== user.email) return alert("You are not the creator of this document.");
-
+                if (normalize(user.email) !== normalize(doc.creator))
+                    return alert("You are not the creator.");
                 await updateDocument(docId, content);
-                alert("Document saved successfully!");
+                alert("Saved!");
             } else {
                 const newId = await createDocument(content);
-                alert("New document created successfully!");
-                // Redirect using absolute path from root
+                alert("Created new document!");
                 window.location.href = `../Editor/editor.html?id=${newId}`;
             }
         } catch (err) {
             console.error(err);
-            alert("Error saving document: " + err.message);
+            alert("Save error: " + err.message);
         }
     });
 }
+function normalize(email) {
+    return (email || "").trim().toLowerCase();
+}
 
 // -----------------------------
-// Load local .txt dataset
+// Load local dataset
 // -----------------------------
 if (loadBtn && loadInput) {
     loadBtn.addEventListener("click", () => loadInput.click());
@@ -515,13 +386,12 @@ if (loadBtn && loadInput) {
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = (event) => {
+        reader.onload = (evt) => {
             try {
-                const data = JSON.parse(event.target.result);
-                populateEditorWithContent(data);
-                alert("Datasets loaded successfully!");
+                populateEditorWithContent(JSON.parse(evt.target.result));
+                alert("Loaded dataset!");
             } catch {
-                alert("Error: file is not valid JSON.");
+                alert("Invalid JSON file.");
             }
         };
         reader.readAsText(file);
@@ -530,22 +400,15 @@ if (loadBtn && loadInput) {
 }
 
 // -----------------------------
-// Auto-load dataset & enforce creator-only access
+// Auth UI & auto-load doc
 // -----------------------------
 async function refreshSignInUI() {
     const user = await getCurrentUser();
-    if (signInBtn) {
-        signInBtn.style.display = user ? 'none' : 'inline-block';
-    }
+    if (signInBtn) signInBtn.style.display = user ? "none" : "inline-block";
 }
-
-// Listen to auth state changes so UI updates instantly on sign in/out
-supabase.auth.onAuthStateChange((_event, _session) => {
-    refreshSignInUI().catch(err => console.error('refreshSignInUI error', err));
-});
+supabase.auth.onAuthStateChange(() => refreshSignInUI());
 
 window.addEventListener('DOMContentLoaded', async () => {
-    // Update sign-in button visibility at startup
     await refreshSignInUI();
 
     const docId = new URLSearchParams(window.location.search).get("id");
@@ -554,48 +417,32 @@ window.addEventListener('DOMContentLoaded', async () => {
     try {
         const doc = await loadDocumentById(docId);
         if (!doc) {
-            alert("Document not found.");
-            window.location.href = "../Viewer/view.html";
-            return;
+            alert("Document not found."); window.location.href = "../Viewer/view.html"; return;
         }
-
         const user = await getCurrentUser();
-
-        if (!user || user.email !== doc.creator) {
-            alert("You are not authorized to edit this document. Redirecting to viewer...");
-            window.location.href = `../Viewer/view.html?id=${docId}`;
-            return;
+        if (!user || normalize(user.email) !== normalize(doc.creator)) {
+            alert("Not authorized. Redirecting to viewer...");
+            window.location.href = `../Viewer/view.html?id=${docId}`; return;
         }
-
-        // Populate editor with content
         if (doc.content) populateEditorWithContent(doc.content);
-
     } catch (err) {
-        console.error("Failed to load document:", err);
-        alert("Error loading document. Redirecting to viewer...");
-        window.location.href = `../Viewer/view.html?id=${docId}`;
+        console.error("Load error:", err);
+        alert("Error loading doc."); window.location.href = `../Viewer/view.html?id=${docId}`;
     }
 });
 
-//---------------------
-// Return home button
-//---------------------
+// -----------------------------
+// Misc buttons
+// -----------------------------
 if (returnHomeBtn) {
-    returnHomeBtn.addEventListener("click", () => {
-        window.location.href = "/index.html";
-    });
+    returnHomeBtn.addEventListener("click", () => window.location.href = "/index.html");
 }
-
-// -----------------------------
-// Organelles hover + click names
-// -----------------------------
 function setupOrganelName(organel, displayName) {
     if (!organel) return;
     organel.addEventListener('click', () => { if (popupname) popupname.textContent = displayName; });
     organel.addEventListener('mouseenter', () => { if (mainorganelname) mainorganelname.textContent = displayName; });
     organel.addEventListener('mouseleave', () => { if (mainorganelname) mainorganelname.textContent = "Célula animal"; });
 }
-
 setupOrganelName(membranacelular, "Membrana celular");
 setupOrganelName(citoplasma, "Citoplasma");
 setupOrganelName(nucleolo, "Nucléolo");
@@ -608,16 +455,13 @@ setupOrganelName(lisosomas, "Lisosomas");
 setupOrganelName(aparatodegolgi, "Aparato de Golgi");
 
 // -----------------------------
-// Sign-in button handling & visibility
+// Sign-in button
 // -----------------------------
 if (signInBtn) {
-    signInBtn.addEventListener('click', async () => {
+    signInBtn.addEventListener("click", async () => {
         const { error } = await supabase.auth.signInWithOAuth({
             provider: "google",
-            options: {
-                // keep redirectTo so Google redirects back into the editor
-                redirectTo: `${location.origin}/MentoriCélulaAnimal/Editor/editor.html`
-            }
+            options: { redirectTo: `${location.origin}/MentoriCélulaAnimal/Editor/editor.html` }
         });
         if (error) {
             console.error("Login error:", error);

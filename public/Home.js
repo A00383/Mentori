@@ -15,7 +15,7 @@ async function login() {
         provider: "google",
         options: {
             // Make sure this EXACT path is added in Google Console Authorized Redirect URIs
-            redirectTo: `${location.origin}/MentoriCélulaAnimal/Editor/editor.html`
+            redirectTo: `${location.origin}/MentoriCelulaAnimal/Editor/editor.html`
         }
     });
     if (error) console.error("Login error:", error.message);

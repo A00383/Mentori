@@ -57,7 +57,7 @@ async function login() {
     const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-            redirectTo: `${location.origin}/MentoriCélulaAnimal/Editor/editor.html`
+            redirectTo: `${location.origin}/MentoriCelulaAnimal/Editor/editor.html`
         }
     });
     if (error) console.error("Login error:", error.message);
@@ -509,7 +509,7 @@ if (copyBtn) {
             const newId = await createDocument(content);
 
             // Open new editor window with new document
-            window.open(`/MentoriCélulaAnimal/Editor/editor.html?id=${newId}`, '_blank');
+            window.open(`/MentoriCelulaAnimal/Editor/editor.html?id=${newId}`, '_blank');
         } catch (err) {
             console.error(err);
             alert('Failed to copy document: ' + err.message);

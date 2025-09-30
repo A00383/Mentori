@@ -466,7 +466,7 @@ if (copyBtn) {
             const newId = await createDocument(content);
 
             // Open new editor window with new document
-            window.open(`/MentoriCélula/Editor/editor.html?id=${newId}`, '_blank');
+            window.open(`/MentoriCélulaAnimal/Editor/editor.html?id=${newId}`, '_blank');
         } catch (err) {
             console.error(err);
             alert('Failed to copy document: ' + err.message);
@@ -616,7 +616,7 @@ if (signInBtn) {
             provider: "google",
             options: {
                 // keep redirectTo so Google redirects back into the editor
-                redirectTo: `${location.origin}/MentoriCélula/Editor/editor.html`
+                redirectTo: `${location.origin}/MentoriCélulaAnimal/Editor/editor.html`
             }
         });
         if (error) {

@@ -15,7 +15,7 @@ async function login() {
         provider: "google",
         options: {
             // Make sure this EXACT path is added in Google Console Authorized Redirect URIs
-            redirectTo: `${location.origin}/MentoriCélula/Editor/editor.html`
+            redirectTo: `${location.origin}/MentoriCélulaAnimal/Editor/editor.html`
         }
     });
     if (error) console.error("Login error:", error.message);
@@ -142,6 +142,6 @@ createBtn.addEventListener("click", async () => {
         window.location.href = `MentoriCélulaAnimal/Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
     } else {
         // Guest user → go directly to static editor
-        window.location.href = "https://mentorigroup.com/MentoriC%C3%A9lula/Editor/editor.html";
+        window.location.href = "https://mentorigroup.com/MentoriC%C3%A9lulaAnimal/Editor/editor.html";
     }
 });

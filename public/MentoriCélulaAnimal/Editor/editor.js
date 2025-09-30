@@ -17,7 +17,6 @@ const popupimageadd = document.getElementById("pop-up-image-add");
 const popupimageremove = document.getElementById("pop-up-image-remove");
 const popupimagecontainer = document.getElementById("pop-up-image-section-images");
 const savebtn = document.getElementById("savebtn");
-const userDiv = document.getElementById("user");
 const saveonlinebutton = document.getElementById("save-online-btn");
 const loadInput = document.getElementById("mainload");
 const loadBtn = document.getElementById("loadbtn");
@@ -406,50 +405,71 @@ if (savebtn) {
 // -----------------------------
 // Supabase Online Save & Load helpers
 // -----------------------------
-async function createDocument(content) {
+async function getCurrentUser() {
+    const { data } = await supabase.auth.getSession();
+    return data?.session?.user ?? null;
+}
+
+async function createDocument(editorContent) {
     const user = await getCurrentUser();
-    if (!user) throw new Error("You must be logged in to save online.");
+    if (!user) throw new Error('Must be logged-in to save document');
 
     const id = nanoid();
     const now = new Date().toISOString();
-    const { error } = await supabase.from("documents").insert({
+    const { error } = await supabase.from('documents').insert({
         id,
         creator: user.email,
         created_at: now,
         updated_at: now,
-        content
+        content: editorContent
     });
+
     if (error) throw error;
     return id;
 }
 
-async function updateDocument(id, content) {
+async function updateDocument(id, editorContent) {
     const now = new Date().toISOString();
-    const { error } = await supabase.from("documents")
-        .update({ content, updated_at: now })
-        .eq("id", id);
+    const { error } = await supabase.from('documents')
+        .update({ content: editorContent, updated_at: now })
+        .eq('id', id);
+
     if (error) throw error;
+    return true;
+}
+
+async function loadDocumentById(id) {
+    const { data, error } = await supabase.from('documents')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+    if (error) throw error;
+    return data;
 }
 
 // ------------------------------
 // Copy Button
 // ------------------------------
 if (copyBtn) {
-    copyBtn.addEventListener("click", async () => {
-        const content = gatherEditorContent();
+    copyBtn.addEventListener('click', async () => {
+        const content = gatherEditorContent(); // get current editor content
         const user = await getCurrentUser();
 
         if (!user) {
-            alert("You must be logged in to copy a document.");
+            alert('You must be signed in to copy this document.');
             return;
         }
 
         try {
+            // Create new document with same content
             const newId = await createDocument(content);
-            window.open(`editor.html?id=${newId}`, "_blank");
+
+            // Open new editor window with new document
+            window.open(`/MentoriCélulaAnimal/Editor/editor.html?id=${newId}`, '_blank');
         } catch (err) {
             console.error(err);
-            alert("Error copying document: " + err.message);
+            alert('Failed to copy document: ' + err.message);
         }
     });
 }
@@ -464,18 +484,20 @@ if (saveonlinebutton) {
 
         try {
             const user = await getCurrentUser();
-            if (!user) {
-                alert("You must be logged in to save online.");
-                return;
-            }
+            if (!user) return alert("You must be logged in to save online.");
 
             if (docId) {
+                const doc = await loadDocumentById(docId);
+                if (!doc) return alert("Document not found.");
+                if (doc.creator !== user.email) return alert("You are not the creator of this document.");
+
                 await updateDocument(docId, content);
-                alert("Document updated!");
+                alert("Document saved successfully!");
             } else {
                 const newId = await createDocument(content);
-                alert("Document saved!");
-                window.location.href = `editor.html?id=${newId}`;
+                alert("New document created successfully!");
+                // Redirect using absolute path from root
+                window.location.href = `../Editor/editor.html?id=${newId}`;
             }
         } catch (err) {
             console.error(err);
@@ -602,47 +624,4 @@ if (signInBtn) {
             alert("Login failed: " + error.message);
         }
     });
-}
-// =======================
-// INITIAL SESSION + UI
-// =======================
-(async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    renderUser(session?.user ?? null);
-})();
-supabase.auth.onAuthStateChange((_evt, session) => {
-    renderUser(session?.user ?? null);
-});
-
-async function login() {
-    const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-            redirectTo: `${location.origin}/MentoriCélulaAnimal/Editor/editor.html`
-        }
-    });
-    if (error) console.error("Login error:", error.message);
-}
-
-async function logout() {
-    await supabase.auth.signOut();
-    renderUser(null);
-}
-
-function renderUser(user) {
-    if (user) {
-        userDiv.innerHTML = `
-          <span style="color:white; margin-right: 10px;">${user.email}</span>
-          <button id="logout">Cerrar sesión</button>
-        `;
-        document.getElementById("logout").addEventListener("click", logout);
-    } else {
-        userDiv.innerHTML = `<button id="login">Iniciar sesión</button>`;
-        document.getElementById("login").addEventListener("click", login);
-    }
-}
-
-async function getCurrentUser() {
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.user ?? null;
 }

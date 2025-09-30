@@ -55,39 +55,11 @@ let currentogranel = null;
 // Auth Helpers
 // -----------------------------
 async function getCurrentUser() {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) {
+        console.error("Session fetch error:", error.message);
+    }
     return session?.user ?? null;
-}
-
-async function login() {
-    const currentParams = new URLSearchParams(window.location.search);
-    const docId = currentParams.get("id"); // preserve the doc id
-
-    const redirectUrl = `${window.location.origin}/MentoriCelulaAnimal/Viewer/view.html${docId ? `?id=${docId}` : ""}`;
-
-    const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: redirectUrl }
-    });
-
-    if (error) {
-        console.error("Login error:", error.message);
-        alert("Login failed: " + error.message);
-    }
-}
-
-async function logout() {
-    const currentParams = new URLSearchParams(window.location.search);
-    const docId = currentParams.get("id");
-
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-        console.error("Logout error:", error.message);
-        alert("Logout failed: " + error.message);
-        return;
-    }
-
-    window.location.href = `${location.origin}/MentoriCelulaAnimal/Viewer/view.html${docId ? `?id=${docId}` : ""}`;
 }
 
 async function renderUser() {
@@ -113,13 +85,13 @@ async function renderUser() {
     }
 }
 
-// ✅ Ensure session is restored before rendering
+// Always ensure session is restored before rendering
 window.addEventListener("DOMContentLoaded", async () => {
     await supabase.auth.getSession();
     await renderUser();
 });
 
-// Re-render user on auth changes
+// React to login/logout
 supabase.auth.onAuthStateChange(() => renderUser());
 
 // -----------------------------
@@ -266,25 +238,27 @@ if (copyBtn) {
                 return;
             }
 
-            // ✅ Use our getCurrentUser helper
             const user = await getCurrentUser();
             if (!user) {
                 alert("You must be logged in to copy documents.");
                 return;
             }
 
-            const { data: newDoc, error } = await supabase
+            // Ensure we copy JSON safely
+            const newContent = JSON.parse(JSON.stringify(originalDoc.content));
+
+            const { data: insertedDocs, error } = await supabase
                 .from("documents")
                 .insert([{
-                    content: originalDoc.content,
+                    content: newContent,
                     creator: user.email
                 }])
-                .select()
-                .single();
+                .select();
 
             if (error) throw error;
 
-            if (newDoc && newDoc.id) {
+            const newDoc = insertedDocs?.[0];
+            if (newDoc?.id) {
                 window.location.href = `../Editor/editor.html?id=${encodeURIComponent(newDoc.id)}`;
             } else {
                 alert("Failed to create a copy.");

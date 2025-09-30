@@ -1,4 +1,12 @@
 // -----------------------------
+// --- Handle Supabase OAuth hash ---
+if (window.location.hash.includes("access_token")) {
+    // Keep query string (?id=...) but drop the OAuth hash (#...)
+    const cleanUrl = window.location.origin + window.location.pathname + window.location.search;
+    window.history.replaceState({}, document.title, cleanUrl);
+}
+
+
 // Imports
 // -----------------------------
 import { supabase } from '/supabase.js';
@@ -50,13 +58,13 @@ async function getCurrentUser() {
 
 async function login() {
     const currentParams = new URLSearchParams(window.location.search);
-    const docId = currentParams.get("id"); // grab the document id if it exists
+    const docId = currentParams.get("id"); // preserve the doc id
+
+    const redirectUrl = `${location.origin}/MentoriCelulaAnimal/Viewer/view.html${docId ? `?id=${docId}` : ""}`;
 
     const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: {
-            redirectTo: `${location.origin}/MentoriCelulaAnimal/Viewer/view.html${docId ? `?id=${docId}` : ""}`
-        }
+        options: { redirectTo: redirectUrl }
     });
 
     if (error) {

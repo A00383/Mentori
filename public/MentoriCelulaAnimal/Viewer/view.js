@@ -250,6 +250,9 @@ window.addEventListener('DOMContentLoaded', async () => {
 // -----------------------------
 // Copy Button (duplicate doc)
 // -----------------------------
+// -----------------------------
+// Copy Button (duplicate doc)
+// -----------------------------
 if (copyBtn) {
     copyBtn.addEventListener('click', async () => {
         const docId = new URLSearchParams(window.location.search).get("id");
@@ -265,21 +268,29 @@ if (copyBtn) {
                 return;
             }
 
-            const { data, error } = await supabase
+            // Get the logged-in user
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                alert("You must be logged in to copy this document.");
+                return;
+            }
+
+            // Insert the new doc linked to the current user
+            const { data: newDoc, error } = await supabase
                 .from("documents")
-                .insert([
-                    {
-                        content: originalDoc.content,
-                        created_at: new Date().toISOString()
-                    }
-                ])
+                .insert([{
+                    content: originalDoc.content,
+                    created_at: new Date().toISOString(),
+                    owner_id: user.id   // <-- make sure your table has this column
+                }])
                 .select()
                 .single();
 
             if (error) throw error;
 
-            if (data && data.id) {
-                window.location.href = `../Editor/editor.html?id=${encodeURIComponent(data.id)}`;
+            if (newDoc && newDoc.id) {
+                // Redirect to Editor for the new copy
+                window.location.href = `../Editor/editor.html?id=${encodeURIComponent(newDoc.id)}`;
             } else {
                 alert("Failed to create a copy.");
             }

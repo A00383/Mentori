@@ -210,7 +210,7 @@ if (copyBtn) {
 
             // Redirect to the new Editor page
             if (data && data.id) {
-                window.location.href = `/MentoriCélula/Editor/editor.html?id=${encodeURIComponent(data.id)}`;
+                window.location.href = `../Editor/editor.html?id=${encodeURIComponent(data.id)}`;
             } else {
                 alert("Failed to create a copy.");
             }

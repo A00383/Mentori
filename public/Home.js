@@ -40,10 +40,8 @@ function renderUser(user) {
     } else {
         userDiv.innerHTML = `
       <button id="login">Iniciar sesión</button>
-      <button id="signup">Registrarse</button>
     `;
         document.getElementById("login").addEventListener("click", login);
-        document.getElementById("signup").addEventListener("click", login);
     }
 }
 

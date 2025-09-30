@@ -8,7 +8,7 @@ import { supabase } from '/supabase.js';
         // Let Supabase process the OAuth hash into a session first
         await supabase.auth.getSession();
 
-        // Then clean the URL (remove the hash but keep query string)
+        // Clean the URL (remove hash, keep query string)
         const cleanUrl = window.location.origin + window.location.pathname + window.location.search;
         window.history.replaceState({}, document.title, cleanUrl);
     }
@@ -55,11 +55,38 @@ let currentogranel = null;
 // Auth Helpers
 // -----------------------------
 async function getCurrentUser() {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) {
-        console.error("Session fetch error:", error.message);
-    }
+    const { data: { session } } = await supabase.auth.getSession();
     return session?.user ?? null;
+}
+
+async function login() {
+    const currentParams = new URLSearchParams(window.location.search);
+    const docId = currentParams.get("id"); // preserve the doc id
+    const redirectUrl = `${window.location.origin}/MentoriCelulaAnimal/Viewer/view.html${docId ? `?id=${docId}` : ""}`;
+
+    const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: redirectUrl }
+    });
+
+    if (error) {
+        console.error("Login error:", error.message);
+        alert("Login failed: " + error.message);
+    }
+}
+
+async function logout() {
+    const currentParams = new URLSearchParams(window.location.search);
+    const docId = currentParams.get("id");
+
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+        console.error("Logout error:", error.message);
+        alert("Logout failed: " + error.message);
+        return;
+    }
+
+    window.location.href = `${location.origin}/MentoriCelulaAnimal/Viewer/view.html${docId ? `?id=${docId}` : ""}`;
 }
 
 async function renderUser() {
@@ -85,14 +112,20 @@ async function renderUser() {
     }
 }
 
-// Always ensure session is restored before rendering
+// ✅ Ensure session restored before rendering
 window.addEventListener("DOMContentLoaded", async () => {
-    await supabase.auth.getSession();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+        console.log("No active session");
+    }
     await renderUser();
 });
 
-// React to login/logout
-supabase.auth.onAuthStateChange(() => renderUser());
+// Re-render user on auth changes
+supabase.auth.onAuthStateChange((_event, session) => {
+    console.log("Auth state changed:", _event, session);
+    renderUser();
+});
 
 // -----------------------------
 // Helpers
@@ -212,7 +245,12 @@ window.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        if (doc.content) populateViewerWithContent(doc.content);
+        if (doc.content) {
+            const parsedContent = typeof doc.content === "string"
+                ? JSON.parse(doc.content)
+                : doc.content;
+            populateViewerWithContent(parsedContent);
+        }
 
     } catch (err) {
         console.error("Failed to load document:", err);
@@ -244,22 +282,21 @@ if (copyBtn) {
                 return;
             }
 
-            // Ensure we copy JSON safely
-            const newContent = JSON.parse(JSON.stringify(originalDoc.content));
+            const newContent = JSON.parse(JSON.stringify(originalDoc.content || {}));
 
-            const { data: insertedDocs, error } = await supabase
+            const { data, error } = await supabase
                 .from("documents")
                 .insert([{
                     content: newContent,
                     creator: user.email
                 }])
-                .select();
+                .select()
+                .maybeSingle();
 
             if (error) throw error;
 
-            const newDoc = insertedDocs?.[0];
-            if (newDoc?.id) {
-                window.location.href = `../Editor/editor.html?id=${encodeURIComponent(newDoc.id)}`;
+            if (data && data.id) {
+                window.location.href = `../Editor/editor.html?id=${encodeURIComponent(data.id)}`;
             } else {
                 alert("Failed to create a copy.");
             }

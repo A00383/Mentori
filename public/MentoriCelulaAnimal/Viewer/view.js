@@ -49,17 +49,22 @@ async function getCurrentUser() {
 }
 
 async function login() {
+    const currentParams = new URLSearchParams(window.location.search);
+    const docId = currentParams.get("id"); // grab the document id if it exists
+
     const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-            redirectTo: `${location.origin}/MentoriCelulaAnimal/Viewer/view.html`
+            redirectTo: `${location.origin}/MentoriCelulaAnimal/Viewer/view.html${docId ? `?id=${docId}` : ""}`
         }
     });
+
     if (error) {
         console.error("Login error:", error.message);
         alert("Login failed: " + error.message);
     }
 }
+
 
 async function logout() {
     const { error } = await supabase.auth.signOut();

@@ -130,7 +130,7 @@ document.addEventListener('click', (e) => {
     const clickedMainRemoveBtn = target === mainremoveBtn;
     const clickedPopupRemoveBtn = target === popupimageremove;
 
-    if ((popupimageremovemode || mainimageremoveMode) &&
+    if ((popupimageremoveMode || mainimageremoveMode) &&
         !clickedMainImage && !clickedPopupImage && !clickedMainRemoveBtn && !clickedPopupRemoveBtn) {
         exitAllRemoveModes();
     }
@@ -168,13 +168,13 @@ function attachPopupImageBehavior(img) {
     img.__popupHandlersAttached = true;
 
     const onClick = (ev) => {
-        if (popupimageremovemode) {
+        if (popupimageremoveMode) {
             ev.stopPropagation();
             if (img.parentElement) img.parentElement.removeChild(img);
         }
     };
     const onEnter = () => {
-        if (popupimageremovemode) addBodyEraser();
+        if (popupimageremoveMode) addBodyEraser();
     };
     const onLeave = () => {
         removeBodyEraser();

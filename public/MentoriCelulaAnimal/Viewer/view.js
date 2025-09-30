@@ -6,7 +6,7 @@ if (window.location.hash.includes("access_token")) {
     window.history.replaceState({}, document.title, cleanUrl);
 }
 
-
+// -----------------------------
 // Imports
 // -----------------------------
 import { supabase } from '/supabase.js';
@@ -73,13 +73,19 @@ async function login() {
     }
 }
 
-
 async function logout() {
+    const currentParams = new URLSearchParams(window.location.search);
+    const docId = currentParams.get("id");
+
     const { error } = await supabase.auth.signOut();
     if (error) {
         console.error("Logout error:", error.message);
         alert("Logout failed: " + error.message);
+        return;
     }
+
+    // After logout, refresh back to the same page (with id preserved if any)
+    window.location.href = `${location.origin}/MentoriCelulaAnimal/Viewer/view.html${docId ? `?id=${docId}` : ""}`;
 }
 
 async function renderUser() {

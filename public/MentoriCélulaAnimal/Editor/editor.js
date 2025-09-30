@@ -1,4 +1,4 @@
-// editor.js — fixed, full file
+// editor.js — fixed, full file with login/logout rendering
 // -----------------------------
 // Top-level imports (must be at top)
 import { supabase } from '/supabase.js';
@@ -28,7 +28,8 @@ const popupname = document.getElementById('pop-up-name');
 const mainorganelname = document.getElementById('organelo');
 const copyBtn = document.getElementById('copybtn');
 const returnHomeBtn = document.getElementById("return-homebtn");
-const signInBtn = document.getElementById("sign-in"); // your new sign-in button
+const signInBtn = document.getElementById("sign-in");
+const userDiv = document.getElementById("user"); // <-- for login/logout UI
 
 // Organelles (may be null if not present)
 const membranacelular = document.getElementById('membrana celular');
@@ -48,6 +49,49 @@ const aparatodegolgi = document.getElementById('aparato de golgi');
 let currentogranel = null;
 let popupimageremovemode = false;
 let mainimageremoveMode = false;
+
+// -----------------------------
+// AUTH HELPERS (added)
+// -----------------------------
+async function login() {
+    const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+            redirectTo: `${location.origin}/MentoriCélulaAnimal/Editor/editor.html`
+        }
+    });
+    if (error) console.error("Login error:", error.message);
+}
+
+async function logout() {
+    await supabase.auth.signOut();
+    renderUser(null);
+}
+
+function renderUser(user) {
+    if (!userDiv) return;
+    if (user) {
+        userDiv.innerHTML = `
+      <span style="color:white; margin-right: 10px;">${user.email}</span>
+      <button id="logout">Cerrar sesión</button>
+    `;
+        document.getElementById("logout")?.addEventListener("click", logout);
+    } else {
+        userDiv.innerHTML = `
+      <button id="login">Iniciar sesión</button>
+    `;
+        document.getElementById("login")?.addEventListener("click", login);
+    }
+}
+
+(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    renderUser(session?.user ?? null);
+})();
+
+supabase.auth.onAuthStateChange((_event, session) => {
+    renderUser(session?.user ?? null);
+});
 
 // -----------------------------
 // Helpers: cursor + removable helpers

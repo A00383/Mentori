@@ -60,11 +60,14 @@ async function login() {
     const currentParams = new URLSearchParams(window.location.search);
     const docId = currentParams.get("id"); // preserve the doc id
 
-    const redirectUrl = `${location.origin}/MentoriCelulaAnimal/Viewer/view.html${docId ? `?id=${docId}` : ""}`;
+    // Full absolute redirect URL
+    const redirectUrl = `${window.location.origin}/MentoriCelulaAnimal/Viewer/view.html${docId ? `?id=${docId}` : ""}`;
 
     const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: redirectUrl }
+        options: {
+            redirectTo: redirectUrl
+        }
     });
 
     if (error) {
@@ -72,6 +75,7 @@ async function login() {
         alert("Login failed: " + error.message);
     }
 }
+
 
 async function logout() {
     const currentParams = new URLSearchParams(window.location.search);

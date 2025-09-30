@@ -14,8 +14,8 @@ async function login() {
     const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-            // Make sure this EXACT path is added in Google Console Authorized Redirect URIs
-            redirectTo: `${location.origin}/MentoriCelulaAnimal/Editor/editor.html`
+            // Redirect back to the current page (homepage) after login
+            redirectTo: `${location.origin}${location.pathname}`
         }
     });
     if (error) console.error("Login error:", error.message);

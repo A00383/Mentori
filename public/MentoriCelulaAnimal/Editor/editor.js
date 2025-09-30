@@ -47,8 +47,9 @@ const aparatodegolgi = document.getElementById('aparato de golgi');
 // State
 // -----------------------------
 let currentogranel = null;
-let popupimageremovemode = false;
+let popupimageremoveMode = false;
 let mainimageremoveMode = false;
+
 
 // -----------------------------
 // AUTH HELPERS (added)
@@ -109,7 +110,7 @@ function removeBodyEraser() {
 }
 
 function exitAllRemoveModes() {
-    popupimageremovemode = false;
+    popupimageremoveMode = false;
     mainimageremoveMode = false;
 
     updateRemovableClass('.pop-up-image', false);
@@ -315,16 +316,6 @@ if (popupimageinput && popupimagecontainer) {
     });
 }
 
-// popup remove toggle
-if (popupimageremove) {
-    popupimageremove.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        popupimageremovemode = !popupimageremovemode;
-
-        updateRemovableClass('.pop-up-image', popupimageremovemode);
-        popupimageremove.textContent = popupimageremovemode ? "Cancelar quitar" : "Quitar imagen";
-    });
-}
 
 // save popup (apply changes back to organelle)
 if (savepopup) {
@@ -335,7 +326,7 @@ if (savepopup) {
         currentogranel.dataset.image = JSON.stringify(imgs);
         // close popup and reset popup remove mode
         popup?.classList.remove('active');
-        popupimageremovemode = false;
+        popupimageremoveMode = false;
         updateRemovableClass('.pop-up-image', false);
         if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
         removeBodyEraser();
@@ -347,7 +338,7 @@ if (closepopup) {
     closepopup.addEventListener("click", () => {
         popup?.classList.remove('active');
         // reset popup remove mode on close
-        popupimageremovemode = false;
+        popupimageremoveMode = false;
         updateRemovableClass('.pop-up-image', false);
         if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
         removeBodyEraser();
@@ -367,7 +358,7 @@ if (popup) {
             popup.classList.remove('active');
 
             // reset popup remove mode
-            popupimageremovemode = false;
+            popupimageremoveMode = false;
             updateRemovableClass('.pop-up-image', false);
             if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
             removeBodyEraser();
@@ -410,6 +401,14 @@ if (mainimageinput && mainimagesContainer) {
 if (mainremoveBtn) {
     mainremoveBtn.addEventListener("click", (ev) => {
         ev.stopPropagation();
+
+        // cancel popup mode if active
+        if (popupimageremoveMode) {
+            popupimageremoveMode = false;
+            updateRemovableClass('.pop-up-image', false);
+            if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
+        }
+
         mainimageremoveMode = !mainimageremoveMode;
 
         // toggle removable class
@@ -419,11 +418,8 @@ if (mainremoveBtn) {
         mainremoveBtn.textContent = mainimageremoveMode ? "Cancelar quitar" : "Quitar imagen";
 
         // eraser cursor on body
-        if (mainimageremoveMode) {
-            addBodyEraser();
-        } else {
-            removeBodyEraser();
-        }
+        if (mainimageremoveMode) addBodyEraser();
+        else removeBodyEraser();
 
         console.log('mainimageremoveMode:', mainimageremoveMode);
     });
@@ -435,6 +431,14 @@ if (mainremoveBtn) {
 if (popupimageremove) {
     popupimageremove.addEventListener("click", (ev) => {
         ev.stopPropagation();
+
+        // cancel main mode if active
+        if (mainimageremoveMode) {
+            mainimageremoveMode = false;
+            updateRemovableClass('.main-image', false);
+            if (mainremoveBtn) mainremoveBtn.textContent = 'Quitar imagen';
+        }
+
         popupimageremoveMode = !popupimageremoveMode;
 
         // toggle removable class
@@ -444,16 +448,12 @@ if (popupimageremove) {
         popupimageremove.textContent = popupimageremoveMode ? "Cancelar quitar" : "Quitar imagen";
 
         // eraser cursor on body
-        if (popupimageremoveMode) {
-            addBodyEraser();
-        } else {
-            removeBodyEraser();
-        }
+        if (popupimageremoveMode) addBodyEraser();
+        else removeBodyEraser();
 
         console.log('popupimageremoveMode:', popupimageremoveMode);
     });
 }
-
 
 // -----------------------------
 // Local save (.txt)

@@ -57,12 +57,10 @@ body {
 }
 
 #loadbtn img {
-    #loadbtn img {
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-        pointer-events: none; /* ensures clicks go to the button, not the img */
-    }
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none; /* ensures clicks go to the button, not the img */
 }
 
 #return-homebtn {

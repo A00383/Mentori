@@ -144,14 +144,18 @@ createBtn.addEventListener("click", async () => {
     }
 });
 //General share button//
-const sharePopup = document.getElementById("general-share-pop-up");
-const shareBtn = document.getElementById("general-celula-animal-share-button");
-const closeShareBtn = document.getElementById("general-share-pop-up-close-button");
+document.addEventListener("DOMContentLoaded", () => {
+    const sharePopup = document.getElementById("general-share-pop-up");
+    const shareBtn = document.getElementById("general-celula-animal-share-button");
+    const closeShareBtn = document.getElementById("general-share-pop-up-close-button");
 
-shareBtn.addEventListener("click", () => {
-    sharePopup.classList.add("active");
-});
+    if (shareBtn && sharePopup && closeShareBtn) {
+        shareBtn.addEventListener("click", () => {
+            sharePopup.classList.add("active");
+        });
 
-closeShareBtn.addEventListener("click", () => {
-    sharePopup.classList.remove("active");
+        closeShareBtn.addEventListener("click", () => {
+            sharePopup.classList.remove("active");
+        });
+    }
 });

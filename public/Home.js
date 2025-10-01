@@ -117,7 +117,7 @@ async function listUserDocs() {
 
         // Rename button
         const renameBtn = document.createElement("button");
-        renameBtn.textContent = "Rename";
+        renameBtn.textContent = "Renombrar";
         renameBtn.addEventListener("click", async (e) => {
             e.stopPropagation();
             const newName = prompt("Enter new name for this document:", doc.name || "");
@@ -136,7 +136,7 @@ async function listUserDocs() {
 
         // Delete button
         const deleteBtn = document.createElement("button");
-        deleteBtn.textContent = "Delete";
+        deleteBtn.textContent = "Borrar";
         deleteBtn.style.color = "red";
         deleteBtn.addEventListener("click", async (e) => {
             e.stopPropagation();

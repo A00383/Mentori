@@ -194,7 +194,6 @@ html, body {
     grid-column: 2;
     justify-self: flex-end;
     align-self: flex-end;
-    aspect-ratio: 1 / 1;
     height: 100%;
 }
 

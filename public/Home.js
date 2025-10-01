@@ -168,7 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 await navigator.clipboard.writeText(textToCopy);
                 // optional feedback
                 copyBtn.textContent = "✔";
-                setTimeout(() => (copyBtn.textContent = "/"), 1500);
+                setTimeout(() => (copyBtn.textContent = "Copiar link"), 1500);
             } catch (err) {
                 console.error("Failed to copy: ", err);
             }

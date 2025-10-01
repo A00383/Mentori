@@ -176,7 +176,6 @@ createBtn.addEventListener("click", async () => {
             .insert([{
                 id: newId,
                 creator: user.email,
-                owner_id: user.id,
                 name: "Untitled Document",
                 content: ""
             }])

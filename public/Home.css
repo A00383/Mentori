@@ -51,9 +51,19 @@ html, body {
     margin-bottom: 15px;
 }
 
-#documents-main-create-section-create-celula-animal-make {
+#documents-main-create-section-create-celula-animal-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 3fr 1fr;
+    grid-row-gap: 5%;
     width: 200px;
     height: 120px;
+    border-radius: 10px;
+}
+
+#documents-main-create-section-create-celula-animal-make {
+    grid-row: 1;
+    grid-column: 1;
     background-color: #e0e0e0;
     border-radius: 10px;
     display: flex;
@@ -61,6 +71,14 @@ html, body {
     align-items: center;
     cursor: pointer;
     transition: transform 0.2s;
+    border-color: black;
+}
+
+#documents-main-create-section-create-celula-animal-extras{
+    grid-row: 2;
+    grid-column: 1;
+    border-color: black;
+    border-radius: 12px;
 }
 
 #documents-main-create-section-create-celula-animal-make:hover {
@@ -118,4 +136,73 @@ html, body {
     padding: 10px;
     font-size: 16px;
     font-weight: bold;
+}
+
+#general-share-pop-up {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0,0,0,0.4);
+    display: flex;
+    justify-content: center; /* center horizontally */
+    align-items: center;     /* center vertically */
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    z-index: 1000;
+}
+
+#general-share-pop-up.active {
+    visibility: visible;
+    opacity: 1;
+}
+
+#general-share-pop-up-container {
+    display: grid;
+    grid-template-rows: auto auto;
+    grid-template-columns: 9fr 1fr;
+    width: 75vw;
+    height: 10vh;
+    grid-row-gap: 5%;
+    background-color: white;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+    border-radius: 8px;
+}
+
+#general-share-pop-up-close-button {
+    position: absolute;   /* take it out of flex/grid */
+    top: 1rem;
+    left: 1rem;
+    background-color: red;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+}
+
+#general-share-pop-up-close-button.active {
+    visibility: visible;
+    opacity: 1;
+}
+
+#general-share-pop-up-copy-button {
+    grid-row: 2;
+    grid-column: 2;
+    justify-self: flex-end;
+    align-self: flex-end;
+    aspect-ratio: 1 / 1;
+    height: 100%;
+}
+
+#general-share-pop-up-title {
+    grid-area: 1 / 1 / 2 / 3;
+}
+
+#general-share-pop-up-url {
+    grid-row: 2;
+    grid-column: 1;
 }

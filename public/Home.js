@@ -143,3 +143,15 @@ createBtn.addEventListener("click", async () => {
         window.location.href = "https://mentorigroup.com/MentoriCelulaAnimal/Editor/editor.html";
     }
 });
+//General share button//
+const sharePopup = document.getElementById("general-share-pop-up");
+const shareBtn = document.getElementById("general-celula-animal-share-button");
+const closeShareBtn = document.getElementById("general-share-pop-up-close-button");
+
+shareBtn.addEventListener("click", () => {
+    sharePopup.classList.add("active");
+});
+
+closeShareBtn.addEventListener("click", () => {
+    sharePopup.classList.remove("active");
+});

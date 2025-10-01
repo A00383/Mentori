@@ -51,7 +51,7 @@ html, body {
     margin-bottom: 15px;
 }
 
-#documents-main-create-section-create-celula {
+#documents-main-create-section-create-celula-animal {
     width: 200px;
     height: 120px;
     background-color: #e0e0e0;
@@ -63,7 +63,7 @@ html, body {
     transition: transform 0.2s;
 }
 
-#documents-main-create-section-create-celula:hover {
+#documents-main-create-section-create-celula-animal:hover {
     transform: scale(1.05);
     background-color: #d0d0d0
 }

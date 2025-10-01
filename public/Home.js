@@ -3,7 +3,7 @@ import { supabase } from "./supabase.js";
 import { nanoid } from "https://cdn.jsdelivr.net/npm/nanoid/nanoid.js";
 
 const userDiv = document.getElementById("user");
-const createBtn = document.getElementById("documents-main-create-section-create-celula");
+const createBtn = document.getElementById("documents-main-create-section-create-celula-animal");
 
 // =======================
 // AUTH HELPERS

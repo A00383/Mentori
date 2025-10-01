@@ -148,6 +148,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const sharePopup = document.getElementById("general-share-pop-up");
     const shareBtn = document.getElementById("general-celula-animal-share-button");
     const closeShareBtn = document.getElementById("general-share-pop-up-close-button");
+    const copyBtn = document.getElementById("general-share-pop-up-copy-button");
+    const urlDiv = document.getElementById("general-share-pop-up-url");
 
     if (shareBtn && sharePopup && closeShareBtn) {
         shareBtn.addEventListener("click", () => {
@@ -156,6 +158,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
         closeShareBtn.addEventListener("click", () => {
             sharePopup.classList.remove("active");
+        });
+    }
+
+    if (copyBtn && urlDiv) {
+        copyBtn.addEventListener("click", async () => {
+            const textToCopy = urlDiv.textContent.trim();
+            try {
+                await navigator.clipboard.writeText(textToCopy);
+                // optional feedback
+                copyBtn.textContent = "✔";
+                setTimeout(() => (copyBtn.textContent = "/"), 1500);
+            } catch (err) {
+                console.error("Failed to copy: ", err);
+            }
         });
     }
 });

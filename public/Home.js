@@ -14,7 +14,6 @@ async function login() {
     const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-            // Redirect back to the current page (homepage) after login
             redirectTo: `${location.origin}${location.pathname}`
         }
     });
@@ -74,7 +73,7 @@ async function listUserDocs() {
 
     const { data, error } = await supabase
         .from("documents")
-        .select("id, created_at, updated_at")
+        .select("id, name, created_at, updated_at")
         .eq("creator", user.email)
         .order("updated_at", { ascending: false });
 
@@ -89,29 +88,76 @@ async function listUserDocs() {
         // Create project card
         const card = document.createElement("div");
         card.classList.add("project-card");
-        card.id = doc.id; // Use the document's ID as the div's ID
+        card.id = doc.id;
 
         // Project title
         const title = document.createElement("div");
         title.classList.add("project-title");
-        title.textContent = doc.id; // or any custom title
+        title.textContent = doc.name || doc.id;
 
-        // Project thumbnail (placeholder for now)
+        // Project thumbnail
         const thumbnail = document.createElement("img");
         thumbnail.classList.add("project-thumbnail");
-        thumbnail.src = "https://via.placeholder.com/220x140?text=Thumbnail"; // placeholder
+        thumbnail.src = "https://via.placeholder.com/220x140?text=Thumbnail";
         thumbnail.alt = "Project Thumbnail";
 
-        // Append title and thumbnail to card
         card.appendChild(thumbnail);
         card.appendChild(title);
 
-        // Add click handler to open editor for this project
+        // Add click handler to open editor
         card.addEventListener("click", () => {
             window.location.href = `MentoriCelulaAnimal/Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
         });
 
-        // Add card to container
+        // --- Actions container (Rename / Delete) ---
+        const actions = document.createElement("div");
+        actions.style.display = "flex";
+        actions.style.justifyContent = "space-between";
+        actions.style.padding = "0 10px 10px";
+
+        // Rename button
+        const renameBtn = document.createElement("button");
+        renameBtn.textContent = "Rename";
+        renameBtn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            const newName = prompt("Enter new name for this document:", doc.name || "");
+            if (newName) {
+                const { error: updateError } = await supabase
+                    .from("documents")
+                    .update({ name: newName, updated_at: new Date().toISOString() })
+                    .eq("id", doc.id);
+                if (updateError) {
+                    console.error("Rename error:", updateError);
+                } else {
+                    title.textContent = newName;
+                }
+            }
+        });
+
+        // Delete button
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "Delete";
+        deleteBtn.style.color = "red";
+        deleteBtn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            if (confirm("Are you sure you want to delete this document?")) {
+                const { error: deleteError } = await supabase
+                    .from("documents")
+                    .delete()
+                    .eq("id", doc.id);
+                if (deleteError) {
+                    console.error("Delete error:", deleteError);
+                } else {
+                    card.remove();
+                }
+            }
+        });
+
+        actions.appendChild(renameBtn);
+        actions.appendChild(deleteBtn);
+        card.appendChild(actions);
+
+        // Append card to container
         container.appendChild(card);
     });
 }
@@ -124,11 +170,16 @@ createBtn.addEventListener("click", async () => {
     const user = session?.user;
 
     if (user) {
-        // User is logged in → create a new document in Supabase
         const newId = nanoid();
         const { data: doc, error } = await supabase
             .from("documents")
-            .insert([{ id: newId, creator: user.email, content: "" }])
+            .insert([{
+                id: newId,
+                creator: user.email,
+                owner_id: user.id,
+                name: "Untitled Document",
+                content: ""
+            }])
             .select()
             .single();
 
@@ -139,11 +190,13 @@ createBtn.addEventListener("click", async () => {
 
         window.location.href = `MentoriCelulaAnimal/Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
     } else {
-        // Guest user → go directly to static editor
         window.location.href = "https://mentorigroup.com/MentoriCelulaAnimal/Editor/editor.html";
     }
 });
-//General share button//
+
+// =======================
+// GENERAL SHARE BUTTON
+// =======================
 document.addEventListener("DOMContentLoaded", () => {
     const sharePopup = document.getElementById("general-share-pop-up");
     const shareBtn = document.getElementById("general-celula-animal-share-button");
@@ -166,7 +219,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const textToCopy = urlDiv.textContent.trim();
             try {
                 await navigator.clipboard.writeText(textToCopy);
-                // optional feedback
                 copyBtn.textContent = "✔";
                 setTimeout(() => (copyBtn.textContent = "Copiar link"), 1500);
             } catch (err) {

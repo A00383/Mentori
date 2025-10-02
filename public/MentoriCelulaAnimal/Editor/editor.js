@@ -659,3 +659,14 @@ setupOrganelName(microtubulos, "Microtúbulos");
 setupOrganelName(mitocondrias, "Mitocondrias");
 setupOrganelName(lisosomas, "Lisosomas");
 setupOrganelName(aparatodegolgi, "Aparato de Golgi");
+
+//serviceworker//
+
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (let registration of registrations) {
+            registration.unregister();
+            console.log("Unregistered service worker:", registration);
+        }
+    });
+}

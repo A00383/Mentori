@@ -31,15 +31,15 @@ body {
 }
 
 #savebtn {
-    background-color: blue;
+    background-color: white;
 }
 
 #save-online-btn {
-    background-color: blueviolet;
+    background-color: white;
 }
 
 #copybtn {
-    background-color: lightblue;
+    background-color: white;
 }
 
 #leftui {
@@ -61,7 +61,7 @@ body {
 }
 
 #return-homebtn {
-    background-color: darkgreen;
+    background-color: white;
 }
 
 #user {

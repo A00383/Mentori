@@ -42,6 +42,7 @@ const microtubulos = document.getElementById('microtubulos');
 const mitocondrias = document.getElementById('mitocondrias');
 const lisosomas = document.getElementById('lisosomas');
 const aparatodegolgi = document.getElementById('aparato de golgi');
+const ribosomas = document.getElementById('ribosomas');
 
 // -----------------------------
 // State
@@ -650,6 +651,7 @@ function setupOrganelName(organel, displayName) {
 }
 
 setupOrganelName(membranacelular, "Membrana celular");
+setupOrganelName(ribosomas), "Ribosomas"
 setupOrganelName(citoplasma, "Citoplasma");
 setupOrganelName(nucleolo, "Nucléolo");
 setupOrganelName(nucleo, "Núcleo");

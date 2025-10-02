@@ -57,8 +57,8 @@ body {
 }
 
 #loadbtn img {
-    width: 100%;
-    height: 100%;
+    height: 50%;
+    aspect-ratio: 1/1;
     object-fit: contain;
     pointer-events: none; /* ensures clicks go to the button, not the img */
 }

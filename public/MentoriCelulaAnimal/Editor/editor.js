@@ -651,7 +651,7 @@ function setupOrganelName(organel, displayName) {
 }
 
 setupOrganelName(membranacelular, "Membrana celular");
-setupOrganelName(ribosomas), "Ribosomas"
+setupOrganelName(ribosomas, "Ribosomas");
 setupOrganelName(citoplasma, "Citoplasma");
 setupOrganelName(nucleolo, "Nucléolo");
 setupOrganelName(nucleo, "Núcleo");

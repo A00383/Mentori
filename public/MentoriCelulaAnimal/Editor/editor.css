@@ -18,6 +18,13 @@ body {
     overflow: hidden;
 }
 
+.generalbuttons{
+    aspect-ratio: 1/1;
+    height: 50%;
+    max-width: 80px;
+    max-height: 80px;
+}
+
 #rightui {
     grid-row: 1;
     grid-column: 3;
@@ -27,26 +34,14 @@ body {
 
 #savebtn {
     background-color: blue;
-    aspect-ratio: 1/1;
-    height: 50%;
-    max-width: 80px;
-    max-height: 80px;
 }
 
 #save-online-btn {
     background-color: blueviolet;
-    aspect-ratio: 1/1;
-    height: 50%;
-    max-width: 80px;
-    max-height: 80px;
 }
 
 #copybtn {
     background-color: lightblue;
-    aspect-ratio: 1/1;
-    height: 50%;
-    max-width: 80px;
-    max-height: 80px;
 }
 
 #leftui {
@@ -58,10 +53,6 @@ body {
 
 #loadbtn {
     background-color: green;
-    aspect-ratio: 1/1;
-    height: 50%;
-    max-width: 80px;
-    max-height: 80px;
 }
 
 #loadbtn img {
@@ -73,10 +64,6 @@ body {
 
 #return-homebtn {
     background-color: darkgreen;
-    aspect-ratio: 1/1;
-    height: 50%;
-    max-width: 80px;
-    max-height: 80px;
 }
 
 #user {

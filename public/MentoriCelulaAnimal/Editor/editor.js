@@ -756,41 +756,35 @@ window.addEventListener("DOMContentLoaded", async () => {
         console.warn("⚠️ Failed to get user:", err);
     }
 
-    // ---------- Try normalized schema ----------
+    // ---------- Normalized loader ----------
     try {
         console.log("🔎 Trying normalized loader...");
         const { doc, organelles } = await tryLoadNormalizedWithRetry(docId, 6, 400);
-        console.log("📄 Normalized document result:", doc);
-        console.log("🧩 Normalized organelles:", organelles);
 
         if (doc) {
+            console.log("📄 Normalized document:", doc);
+            console.log("🧩 Organelles:", organelles);
+
+            // --- Permission check ---
             if (!user || user.email !== doc.creator) {
                 alert("No puedes editar este documento. Abriendo en modo visor...");
                 window.location.href = `../Viewer/view.html?id=${docId}`;
                 return;
             }
 
-            // Fill title
+            // --- Title ---
             const titleElem = document.getElementById("document-title");
-            if (titleElem) {
-                titleElem.innerText = doc.title || "Untitled";
-            } else {
-                console.warn("⚠️ Missing element: #document-title");
-            }
+            if (titleElem) titleElem.innerText = doc.title || "Untitled";
+            else console.warn("⚠️ Missing element: #document-title");
 
-            // Fill description
+            // --- Description ---
             const descElem = document.getElementById("description");
-            if (descElem) {
-                descElem.value = doc.description || "";
-            } else {
-                console.warn("⚠️ Missing element: #description");
-            }
+            if (descElem) descElem.value = doc.description || "";
+            else console.warn("⚠️ Missing element: #description");
 
-            // Fill organelles
+            // --- Organelles ---
             (organelles || []).forEach(o => {
-                let section = document.querySelector(`[data-organelle="${o.name}"]`);
-                if (!section) section = document.getElementById(o.name);
-
+                let section = document.querySelector(`[data-organelle="${o.name}"]`) || document.getElementById(o.name);
                 if (section) {
                     section.dataset.content = o.content || "";
                     section.dataset.image = JSON.stringify((o.images || []).map(i => i.url));
@@ -800,39 +794,39 @@ window.addEventListener("DOMContentLoaded", async () => {
             });
 
             console.log("✅ Normalized document loaded successfully");
-            return;
+            return; // stop here if success
         }
     } catch (normErr) {
         console.error("❌ Normalized load error:", normErr);
-        // don’t redirect yet — try legacy
     }
 
-    // ---------- Fallback: legacy JSON ----------
+    // ---------- Legacy loader ----------
     try {
         console.log("🔎 Trying legacy loader...");
         const legacyDoc = await loadDocumentById(docId);
-        console.log("📄 Legacy document result:", legacyDoc);
 
-        if (!legacyDoc) {
-            alert("Documento no encontrado. Si acabas de crearlo, espera y recarga.");
+        if (legacyDoc) {
+            console.log("📄 Legacy document:", legacyDoc);
+
+            // --- Permission check ---
+            if (!user || user.email !== legacyDoc.creator) {
+                alert("No puedes editar este documento. Abriendo en modo visor...");
+                window.location.href = `../Viewer/view.html?id=${docId}`;
+                return;
+            }
+
+            if (legacyDoc.content) {
+                console.log("📝 Populating editor with legacy content...");
+                populateEditorWithContent(legacyDoc.content);
+            } else {
+                console.warn("⚠️ Legacy doc has no content field");
+            }
+
+            console.log("✅ Legacy document loaded successfully");
             return;
-        }
-
-        if (!user || user.email !== legacyDoc.creator) {
-            alert("No puedes editar este documento. Abriendo en modo visor...");
-            window.location.href = `../Viewer/view.html?id=${docId}`;
-            return;
-        }
-
-        if (legacyDoc.content) {
-            console.log("📝 Populating editor with legacy content...");
-            populateEditorWithContent(legacyDoc.content);
         } else {
-            console.warn("⚠️ Legacy doc has no content field");
+            alert("Documento no encontrado. Si acabas de crearlo, espera y recarga.");
         }
-
-        console.log("✅ Legacy document loaded successfully");
-        return;
     } catch (legacyErr) {
         console.error("❌ Legacy load error:", legacyErr);
         alert("Error cargando el documento. Abriendo en visor...");

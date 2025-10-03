@@ -719,11 +719,16 @@ async function refreshSignInUI() {
     }
 }
 
-// Listen to auth state changes so UI updates instantly on sign in/out
+// =======================
+// AUTH STATE HANDLING
+// =======================
 supabase.auth.onAuthStateChange((_event, _session) => {
-    refreshSignInUI().catch(err => console.error('refreshSignInUI error', err));
+    refreshSignInUI().catch(err => console.error("refreshSignInUI error", err));
 });
 
+// =======================
+// DOCUMENT LOADING
+// =======================
 window.addEventListener("DOMContentLoaded", async () => {
     await refreshSignInUI();
     const docId = new URLSearchParams(window.location.search).get("id");
@@ -736,8 +741,8 @@ window.addEventListener("DOMContentLoaded", async () => {
         console.warn("Failed to get user:", err);
     }
 
+    // ---------- Try normalized schema ----------
     try {
-        // First: try normalized schema with retry (covers new docs just created)
         const { doc, organelles } = await tryLoadNormalizedWithRetry(docId, 6, 400);
 
         if (doc) {
@@ -747,11 +752,14 @@ window.addEventListener("DOMContentLoaded", async () => {
                 return;
             }
 
+            // Fill title + description
             const titleElem = document.getElementById("document-title");
             if (titleElem) titleElem.innerText = doc.title || "Untitled";
+
             const descElem = document.getElementById("description");
             if (descElem) descElem.value = doc.description || "";
 
+            // Fill organelles
             (organelles || []).forEach(o => {
                 let section = document.querySelector(`[data-organelle="${o.name}"]`);
                 if (!section) section = document.getElementById(o.name);
@@ -760,37 +768,37 @@ window.addEventListener("DOMContentLoaded", async () => {
                     section.dataset.image = JSON.stringify((o.images || []).map(i => i.url));
                 }
             });
+
+            return; // ✅ Loaded successfully
+        }
+    } catch (normErr) {
+        console.error("Normalized load error", normErr);
+        // don’t redirect yet — try legacy
+    }
+
+    // ---------- Fallback: legacy JSON ----------
+    try {
+        const legacyDoc = await loadDocumentById(docId);
+        if (!legacyDoc) {
+            alert("Documento no encontrado. Si acabas de crearlo, espera y recarga.");
             return;
         }
 
-        // Fallback: legacy JSON content
-        try {
-            const legacyDoc = await loadDocumentById(docId); // your existing old loader
-            if (!legacyDoc) {
-                alert("Documento no encontrado. Si acabas de crearlo, espera y recarga.");
-                return;
-            }
-
-            if (!user || user.email !== legacyDoc.creator) {
-                alert("No puedes editar este documento. Abriendo en modo visor...");
-                window.location.href = `../Viewer/view.html?id=${docId}`;
-                return;
-            }
-
-            if (legacyDoc.content) populateEditorWithContent(legacyDoc.content);
-            return;
-        } catch (legacyErr) {
-            console.error("Legacy load error", legacyErr);
-            alert("Error cargando el documento. Abriendo en visor...");
+        if (!user || user.email !== legacyDoc.creator) {
+            alert("No puedes editar este documento. Abriendo en modo visor...");
             window.location.href = `../Viewer/view.html?id=${docId}`;
             return;
         }
-    } catch (err) {
-        console.error("Unexpected load error", err);
-        alert("Ha ocurrido un error cargando el documento. Abriendo en visor...");
+
+        if (legacyDoc.content) populateEditorWithContent(legacyDoc.content);
+        return;
+    } catch (legacyErr) {
+        console.error("Legacy load error", legacyErr);
+        alert("Error cargando el documento. Abriendo en visor...");
         window.location.href = `../Viewer/view.html?id=${docId}`;
     }
 });
+
 
 
 //---------------------

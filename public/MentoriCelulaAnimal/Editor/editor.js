@@ -454,13 +454,13 @@ async function createDocumentAndAssets(editorContent) {
     // Insert documents row
     const { error: docErr } = await supabase.from('documents').insert({
         id,
-        title: editorContent.title || "Untitled",
-        description: editorContent.description || "",
         creator: user.email,
         owner_id: user.id,
         created_at: now,
-        updated_at: now
+        updated_at: now,
+        content: editorContent   // <--- FIX
     });
+
     if (docErr) throw docErr;
 
     // Insert organelles & their images
@@ -512,8 +512,8 @@ async function updateDocumentAndAssets(documentId, editorContent) {
     // update doc metadata
     const { error: docErr } = await supabase.from('documents')
         .update({
-            description: editorContent.description || "",
-            updated_at: now
+            updated_at: now,
+            content: editorContent  // <--- FIX
         })
         .eq('id', documentId);
     if (docErr) throw docErr;

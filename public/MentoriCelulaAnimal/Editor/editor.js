@@ -727,170 +727,65 @@ supabase.auth.onAuthStateChange((_event, _session) => {
 });
 
 // =======================
-// DOCUMENT LOADING
+// NORMALIZED LOADER
 // =======================
-window.addEventListener("DOMContentLoaded", async () => {
-    console.log("🔄 DOM ready, starting document load...");
+async function tryLoadNormalizedWithRetry(docId, retries = 3, delayMs = 500) {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            console.log(`🔄 Normalized attempt ${attempt}/${retries}`);
 
-    // --- Refresh Sign In UI ---
-    try {
-        await refreshSignInUI();
-    } catch (err) {
-        console.error("⚠️ refreshSignInUI error:", err);
-    }
+            // Query main document
+            const { data: docs, error: docErr } = await supabase
+                .from("documents")
+                .select("*")
+                .eq("id", docId)
+                .limit(1);
 
-    // --- Get document ID from URL ---
-    const docId = new URLSearchParams(window.location.search).get("id");
-    if (!docId) {
-        console.warn("⚠️ No docId in URL");
-        return;
-    }
-    console.log("📌 Document ID:", docId);
+            if (docErr) throw new Error(`Supabase error [documents]: ${docErr.message}`);
 
-    // --- Get current user ---
-    let user = null;
-    try {
-        user = await getCurrentUser();
-        console.log("✅ Current user:", user?.email || "(none)");
-    } catch (err) {
-        console.warn("⚠️ Failed to get user:", err);
-    }
+            const doc = docs?.[0];
+            if (!doc) throw new Error("No normalized doc found");
 
-    // ---------- Normalized loader ----------
-    try {
-        console.log("🔎 Trying normalized loader...");
-        const { doc, organelles } = await tryLoadNormalizedWithRetry(docId, 6, 400);
+            // Query organelles (assuming table: document_organelles)
+            const { data: organelles, error: orgErr } = await supabase
+                .from("document_organelles")
+                .select("*")
+                .eq("document_id", docId);
 
-        if (doc) {
-            console.log("📄 Normalized document:", doc);
-            console.log("🧩 Organelles:", organelles);
+            if (orgErr) throw new Error(`Supabase error [organelles]: ${orgErr.message}`);
 
-            // --- Permission check ---
-            if (!user || user.email !== doc.creator) {
-                alert("No puedes editar este documento. Abriendo en modo visor...");
-                window.location.href = `../Viewer/view.html?id=${docId}`;
-                return;
+            return { doc, organelles };
+        } catch (err) {
+            console.warn(`⚠️ Normalized load failed (attempt ${attempt}):`, err);
+
+            if (attempt < retries) {
+                await new Promise(res => setTimeout(res, delayMs));
+                continue; // retry
             }
 
-            // --- Title ---
-            const titleElem = document.getElementById("document-title");
-            if (titleElem) titleElem.innerText = doc.title || "Untitled";
-            else console.warn("⚠️ Missing element: #document-title");
-
-            // --- Description ---
-            const descElem = document.getElementById("description");
-            if (descElem) descElem.value = doc.description || "";
-            else console.warn("⚠️ Missing element: #description");
-
-            // --- Organelles ---
-            (organelles || []).forEach(o => {
-                let section = document.querySelector(`[data-organelle="${o.name}"]`) || document.getElementById(o.name);
-                if (section) {
-                    section.dataset.content = o.content || "";
-                    section.dataset.image = JSON.stringify((o.images || []).map(i => i.url));
-                } else {
-                    console.warn(`⚠️ Missing organelle section for: ${o.name}`);
-                }
-            });
-
-            console.log("✅ Normalized document loaded successfully");
-            return; // stop here if success
+            throw err; // rethrow final failure
         }
-    } catch (normErr) {
-        console.error("❌ Normalized load error:", normErr);
+    }
+}
+// =======================
+// LEGACY LOADER
+// =======================
+async function loadDocumentById(docId) {
+    console.log("🔄 Loading legacy doc by ID:", docId);
+
+    const { data, error } = await supabase
+        .from("documents")
+        .select("*")
+        .eq("id", docId)
+        .maybeSingle();
+
+    if (error) {
+        throw new Error(`Supabase legacy load error: ${error.message}`);
     }
 
-    // ---------- Legacy loader ----------
-    try {
-        console.log("🔎 Trying legacy loader...");
-        const legacyDoc = await loadDocumentById(docId);
-
-        if (legacyDoc) {
-            console.log("📄 Legacy document:", legacyDoc);
-
-            // --- Permission check ---
-            if (!user || user.email !== legacyDoc.creator) {
-                alert("No puedes editar este documento. Abriendo en modo visor...");
-                window.location.href = `../Viewer/view.html?id=${docId}`;
-                return;
-            }
-
-            if (legacyDoc.content) {
-                console.log("📝 Populating editor with legacy content...");
-                populateEditorWithContent(legacyDoc.content);
-            } else {
-                console.warn("⚠️ Legacy doc has no content field");
-            }
-
-            console.log("✅ Legacy document loaded successfully");
-            return;
-        } else {
-            alert("Documento no encontrado. Si acabas de crearlo, espera y recarga.");
-        }
-    } catch (legacyErr) {
-        console.error("❌ Legacy load error:", legacyErr);
-        alert("Error cargando el documento. Abriendo en visor...");
-        window.location.href = `../Viewer/view.html?id=${docId}`;
+    if (!data) {
+        throw new Error("Legacy document not found");
     }
-});
 
-
-
-
-//---------------------
-// Return home button
-//---------------------
-if (returnHomeBtn) {
-    returnHomeBtn.addEventListener("click", () => {
-        window.location.href = "/index.html";
-    });
-}
-
-// -----------------------------
-// Organelles hover + click names
-// -----------------------------
-function setupOrganelName(organel, displayName) {
-    if (!organel) return;
-    organel.addEventListener('click', () => { if (popupname) popupname.textContent = displayName; });
-    organel.addEventListener('mouseenter', () => { if (mainorganelname) mainorganelname.textContent = displayName; });
-    organel.addEventListener('mouseleave', () => { if (mainorganelname) mainorganelname.textContent = "Célula animal"; });
-}
-
-setupOrganelName(membranacelular, "Membrana celular");
-setupOrganelName(ribosomas, "Ribosomas");
-setupOrganelName(citoplasma, "Citoplasma");
-setupOrganelName(nucleolo, "Nucléolo");
-setupOrganelName(nucleo, "Núcleo");
-setupOrganelName(reticuloendoplasmatico, "Retículo endoplasmático");
-setupOrganelName(centriolos, "Centriolos");
-setupOrganelName(microtubulos, "Microtúbulos");
-setupOrganelName(mitocondrias, "Mitocondrias");
-setupOrganelName(lisosomas, "Lisosomas");
-setupOrganelName(aparatodegolgi, "Aparato de Golgi");
-
-//serviceworker//
-
-if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.getRegistrations().then((registrations) => {
-        for (let registration of registrations) {
-            registration.unregister();
-            console.log("Unregistered service worker:", registration);
-        }
-    });
-}
-
-// ------------------------------
-// Switch to Viewer Mode
-// ------------------------------
-if (switchviewbtn) {
-    switchviewbtn.addEventListener("click", () => {
-        const docId = new URLSearchParams(window.location.search).get("id");
-        if (!docId) {
-            alert("No se encontró un ID de documento. Guarda el documento antes de cambiar a modo visor.");
-            return;
-        }
-        const viewerUrl = `https://mentorigroup.com/MentoriCelulaAnimal/Viewer/view.html?id=${docId}`;
-        window.open(viewerUrl, "_blank"); // opens in new tab
-        // Or use window.location.href = viewerUrl; if you want to replace instead of opening
-    });
+    return data;
 }

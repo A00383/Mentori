@@ -28,6 +28,8 @@ body {
     grid-column: 3;
     width: 100%;
     height: 100%;
+    justify-content: space-evenly;
+    align-items: center;
 }
 
 #savebtn {
@@ -46,7 +48,9 @@ body {
     grid-row: 1;
     grid-column: 1;
     width: 100%;
-    height: 100%
+    height: 100%;
+    justify-content: space-evenly;
+    align-items: center;
 }
 
 #loadbtn {

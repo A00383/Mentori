@@ -472,44 +472,109 @@ if (savebtn) {
     });
 }
 
-// =======================
-// UPDATE DOCUMENT ONLINE
-// =======================
 async function updateDocumentOnline(documentId) {
-    // --- Ensure user is logged in ---
     const user = await getCurrentUser();
     if (!user) throw new Error("❌ Usuario no autenticado");
 
-    // --- Collect editor state ---
-    const content = gatherEditorContent(); // must return JSON-safe object
     const now = new Date().toISOString();
 
-    console.log("💾 Updating document:", documentId, {
-        creator: user.email,
-        owner_id: user.id,
-        updated_at: now,
-        content
-    });
-
-    // --- Update row in documents ---
     const { error } = await supabase
         .from("documents")
         .update({
-            content,                    // JSONB field
             updated_at: now,
             creator: user.email ?? "",
             owner_id: user.id ?? null
         })
         .eq("id", documentId);
 
-    if (error) {
-        console.error("❌ Error updating document:", error);
-        throw error;
-    }
+    if (error) throw error;
 
-    console.log("✅ Document updated successfully");
+    // 🔑 Save organelles + images separately
+    await saveOrganellesAndImages(documentId);
 }
 
+
+async function saveOrganellesAndImages(documentId) {
+    const organelleSections = document.querySelectorAll(".organelos");
+
+    for (let section of organelleSections) {
+        const name = section.dataset.organelle || section.id;
+        const content = section.dataset.content || "";
+
+        // Upsert organelle
+        const { data: organelle, error: orgErr } = await supabase.from("organelles")
+            .upsert({
+                document_id: documentId,
+                name,
+                content,
+                updated_at: new Date()
+            }, { onConflict: "document_id,name" })
+            .select()
+            .single();
+
+        if (orgErr) {
+            console.error("Error saving organelle:", orgErr);
+            continue;
+        }
+
+        // Save images for this organelle
+        const imgs = section.querySelectorAll("img");
+        for (let img of imgs) {
+            let imageUrl = img.src;
+
+            if (imageUrl.startsWith("data:")) {
+                const filePath = `${documentId}/${organelle.id}/${Date.now()}.png`;
+                const response = await fetch(imageUrl);
+                const blob = await response.blob();
+
+                const { error: uploadError } = await supabase.storage
+                    .from("images")
+                    .upload(filePath, blob, { upsert: true });
+
+                if (!uploadError) {
+                    const { data: publicUrlData } = supabase.storage
+                        .from("images")
+                        .getPublicUrl(filePath);
+                    imageUrl = publicUrlData.publicUrl;
+                }
+            }
+
+            await supabase.from("images").upsert({
+                document_id: documentId,
+                organelle_id: organelle.id,
+                url: imageUrl
+            }, { onConflict: "organelle_id,url" });
+        }
+    }
+
+    // ✅ Handle "main images" not tied to organelles
+    const mainImgs = [...(mainimagesContainer?.querySelectorAll("img") || [])];
+    for (let img of mainImgs) {
+        let imageUrl = img.src;
+
+        if (imageUrl.startsWith("data:")) {
+            const filePath = `${documentId}/main/${Date.now()}.png`;
+            const response = await fetch(imageUrl);
+            const blob = await response.blob();
+
+            const { error: uploadError } = await supabase.storage
+                .from("images")
+                .upload(filePath, blob, { upsert: true });
+
+            if (!uploadError) {
+                const { data: publicUrlData } = supabase.storage
+                    .from("images")
+                    .getPublicUrl(filePath);
+                imageUrl = publicUrlData.publicUrl;
+            }
+        }
+
+        await supabase.from("images").upsert({
+            document_id: documentId,
+            url: imageUrl
+        }, { onConflict: "document_id,url" });
+    }
+}
 
 
 
@@ -758,25 +823,29 @@ async function tryLoadNormalizedWithRetry(docId, retries = 3, delayMs = 500) {
 // =======================
 // LEGACY LOADER
 // =======================
-async function loadDocumentById(docId) {
-    console.log("🔄 Loading legacy doc by ID:", docId);
-
-    const { data, error } = await supabase
+async function tryLoadNormalizedWithRetry(docId) {
+    const { data: docs } = await supabase
         .from("documents")
         .select("*")
         .eq("id", docId)
-        .maybeSingle();
+        .limit(1);
 
-    if (error) {
-        throw new Error(`Supabase legacy load error: ${error.message}`);
-    }
+    const doc = docs?.[0];
+    if (!doc) throw new Error("No doc found");
 
-    if (!data) {
-        throw new Error("Legacy document not found");
-    }
+    const { data: organelles } = await supabase
+        .from("organelles")
+        .select("*")
+        .eq("document_id", docId);
 
-    return data;
+    const { data: images } = await supabase
+        .from("images")
+        .select("*")
+        .eq("document_id", docId);
+
+    return { doc, organelles, images };
 }
+
 
 // =======================
 // DOCUMENT LOADING

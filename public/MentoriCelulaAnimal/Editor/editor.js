@@ -790,3 +790,16 @@ window.addEventListener("DOMContentLoaded", async () => {
         console.error("❌ Failed legacy load:", legacyErr);
     }
 });
+
+setupOrganelName(membranacelular, "Membrana celular");
+setupOrganelName(ribosomas, "Ribosomas");
+setupOrganelName(citoplasma, "Citoplasma");
+setupOrganelName(nucleolo, "Nucléolo");
+setupOrganelName(nucleo, "Núcleo");
+setupOrganelName(reticuloendoplasmatico, "Retículo endoplasmático");
+setupOrganelName(centriolos, "Centriolos");
+setupOrganelName(microtubulos, "Microtúbulos");
+setupOrganelName(mitocondrias, "Mitocondrias");
+setupOrganelName(lisosomas, "Lisosomas");
+setupOrganelName(aparatodegolgi, "Aparato de Golgi");
+

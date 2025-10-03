@@ -31,7 +31,8 @@ html, body {
 
 
 #documents-main {
-    background-color: white;
+    background: url("./Assets/Mentori-background.svg") no-repeat center center;
+    background-size: cover;
     grid-column: 1;
     grid-row: 2;
     display: flex;

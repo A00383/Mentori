@@ -201,12 +201,9 @@ document.addEventListener("DOMContentLoaded", () => {
             sharePopup.classList.remove("active");
         });
 
-        // Close popup when clicking outside of it
-        document.addEventListener("click", (event) => {
-            const isClickInsidePopup = sharePopup.contains(event.target);
-            const isClickOnButton = shareBtn.contains(event.target);
-
-            if (!isClickInsidePopup && !isClickOnButton) {
+        // Close popup when clicking on the background (not its children)
+        sharePopup.addEventListener("click", (event) => {
+            if (event.target === sharePopup) {
                 sharePopup.classList.remove("active");
             }
         });

@@ -434,10 +434,9 @@ async function getCurrentUser() {
 // CREATE document + organelles + images
 // -----------------------------
 async function createDocumentAndAssets(editorContent, docId = null) {
-    const savedId = await createDocumentAndAssets(content, docId);
-    console.log("⚡ After createDocumentAndAssets, got:", savedId);
     const user = await getCurrentUser();
     console.log("👤 Current user:", user);
+
     if (!user) {
         alert("❌ Please login first");
         return null;
@@ -446,23 +445,14 @@ async function createDocumentAndAssets(editorContent, docId = null) {
     const now = new Date().toISOString();
     const id = docId || window.nanoid();
 
-    console.log("📝 Attempting upsert with data:", {
-        id,
-        title: "Célula animal",
-        description: editorContent.description,
-        content: editorContent,
-        creator: user.email,
-        owner_id: user.id,
-        created_at: now,
-        updated_at: now,
-    });
+    console.log("📝 Saving document with ID:", id, "for user:", user.id);
 
     const { error: docErr } = await supabase.from("documents").upsert(
         {
             id,
             title: "Célula animal",
             description: editorContent.description,
-            content: editorContent,
+            content: editorContent, // ✅ use the argument, not a missing variable
             creator: user.email,
             owner_id: user.id,
             created_at: now,
@@ -480,6 +470,7 @@ async function createDocumentAndAssets(editorContent, docId = null) {
     console.log("✅ Document saved!");
     return id;
 }
+
 
 
 // -----------------------------

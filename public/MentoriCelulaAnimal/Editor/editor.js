@@ -87,6 +87,19 @@ function renderUser(user) {
     }
 }
 
+// -----------------------------
+// Get current user (auth helper)
+// -----------------------------
+async function getCurrentUser() {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+        console.error("getCurrentUser error:", error);
+        return null;
+    }
+    return data?.user ?? null;
+}
+
+
 
 (async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -462,11 +475,6 @@ if (savebtn) {
 // -----------------------------
 // Supabase Online Save & Load (normalized schema)
 // -----------------------------
-async function getCurrentUser() {
-    const { data } = await supabase.auth.getSession();
-    return data?.session?.user ?? null;
-}
-
 async function createDocumentOnline() {
     const user = await getCurrentUser();
     if (!user) throw new Error("Usuario no autenticado");
@@ -474,19 +482,26 @@ async function createDocumentOnline() {
     const id = nanoid();
     const now = new Date().toISOString();
 
-    const { error } = await supabase.from("documents").insert({
+    const insertPayload = {
         id,
         title: "Untitled",
         description: "",
-        creator: user.email,   // ✅ email for easy querying
-        owner_id: user.id,     // ✅ uuid for secure ownership
+        creator: user.email ?? "",   // ✅ email
+        owner_id: user.id ?? null,   // ✅ UUID
         created_at: now,
         updated_at: now
-    });
+    };
+
+    console.log("Insert payload:", insertPayload); // debug log
+
+    const { data, error } = await supabase.from("documents").insert(insertPayload).select().single();
 
     if (error) throw error;
-    return id;
+    console.log("Inserted doc:", data);
+
+    return data.id;
 }
+
 
 
 async function saveOrganellesAndImages(documentId) {

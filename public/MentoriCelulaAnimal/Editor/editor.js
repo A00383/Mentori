@@ -458,51 +458,116 @@ if (savebtn) {
 }
 
 // -----------------------------
-// Supabase Online Save & Load helpers
+// Supabase Online Save & Load (normalized schema)
 // -----------------------------
 async function getCurrentUser() {
     const { data } = await supabase.auth.getSession();
     return data?.session?.user ?? null;
 }
 
-async function createDocument(editorContent) {
+async function createDocumentOnline() {
     const user = await getCurrentUser();
     if (!user) throw new Error('Must be logged-in to save document');
 
     const id = nanoid();
     const now = new Date().toISOString();
-    const { error } = await supabase.from('documents').insert({
+
+    const title = document.getElementById("document-title")?.innerText || "Untitled";
+    const description = document.getElementById("description")?.value || "";
+
+    const { error } = await supabase.from("documents").insert({
         id,
+        title,
+        description,
         creator: user.email,
         owner_id: user.id,
         created_at: now,
-        updated_at: now,
-        content: editorContent
+        updated_at: now
     });
-
     if (error) throw error;
     return id;
 }
 
-async function updateDocument(id, editorContent) {
+async function saveOrganellesAndImages(documentId) {
+    const organelleSections = document.querySelectorAll("[data-organelle]");
+    for (let section of organelleSections) {
+        const name = section.dataset.organelle;
+        const content = section.dataset.content || "";
+
+        // upsert organelle
+        const { data: organelle, error: orgErr } = await supabase.from("organeles")
+            .upsert({
+                document_id: documentId,
+                name,
+                content,
+                updated_at: new Date()
+            }, { onConflict: "document_id,name" })
+            .select()
+            .single();
+        if (orgErr) throw orgErr;
+
+        // upsert images
+        const imgs = JSON.parse(section.dataset.image || "[]");
+        for (let src of imgs) {
+            const { error: imgErr } = await supabase.from("images").upsert({
+                document_id: documentId,
+                organelle_id: organelle.id,
+                url: src
+            }, { onConflict: "organelle_id,url" });
+            if (imgErr) throw imgErr;
+        }
+    }
+
+    // Save main images
+    const mainImgs = [...(mainimagesContainer?.querySelectorAll("img") || [])].map(img => img.src);
+    for (let src of mainImgs) {
+        await supabase.from("images").upsert({
+            document_id: documentId,
+            url: src
+        }, { onConflict: "document_id,url" });
+    }
+}
+
+async function updateDocumentOnline(docId) {
     const now = new Date().toISOString();
-    const { error } = await supabase.from('documents')
-        .update({ content: editorContent, updated_at: now })
-        .eq('id', id);
+    const title = document.getElementById("document-title")?.innerText || "Untitled";
+    const description = document.getElementById("description")?.value || "";
 
+    const { error } = await supabase.from("documents")
+        .update({ title, description, updated_at: now })
+        .eq("id", docId);
     if (error) throw error;
-    return true;
+
+    await saveOrganellesAndImages(docId);
 }
 
-async function loadDocumentById(id) {
-    const { data, error } = await supabase.from('documents')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
-
+async function loadDocumentByIdOnline(id) {
+    const { data: doc, error } = await supabase.from("documents")
+        .select("*").eq("id", id).single();
     if (error) throw error;
-    return data;
+
+    // load organelles + images
+    const { data: organelles } = await supabase.from("organeles")
+        .select("*, images(*)")
+        .eq("document_id", id);
+
+    // apply to UI
+    if (doc) {
+        document.getElementById("document-title").innerText = doc.title || "Untitled";
+        document.getElementById("description").value = doc.description || "";
+    }
+    if (organelles) {
+        organelles.forEach(organelle => {
+            const section = document.querySelector(`[data-organelle="${organelle.name}"]`);
+            if (section) {
+                section.dataset.content = organelle.content || "";
+                section.dataset.image = JSON.stringify((organelle.images || []).map(i => i.url));
+            }
+        });
+    }
+    return doc;
 }
+
 
 // ------------------------------
 // Copy Button
@@ -535,32 +600,29 @@ if (copyBtn) {
 // -----------------------------
 if (saveonlinebutton) {
     saveonlinebutton.addEventListener("click", async () => {
-        const content = gatherEditorContent();
         const docId = new URLSearchParams(window.location.search).get("id");
-
         try {
             const user = await getCurrentUser();
-            if (!user) return alert("Debes estar en una cuenta para poder guardar en linea.");
+            if (!user) return alert("Debes haber iniciado sesión.");
 
             if (docId) {
-                const doc = await loadDocumentById(docId);
-                if (!doc) return alert("No se encontro el documento.");
-                if (doc.creator !== user.email) return alert("Tú no eres el creador de este documento.");
-
-                await updateDocument(docId, content);
-                alert("Documento guardado exitosamente!");
+                await updateDocumentOnline(docId);
+                alert("Documento actualizado!");
             } else {
-                const newId = await createDocument(content);
-                alert("Documento guardado exitosamente!");
-                // Redirect using absolute path from root
+                const newId = await createDocumentOnline();
+                await saveOrganellesAndImages(newId);
+                alert("Documento guardado en línea!");
                 window.location.href = `../Editor/editor.html?id=${newId}`;
             }
         } catch (err) {
             console.error(err);
-            alert("Error al guardar el documento: " + err.message);
+            alert("Error al guardar en línea: " + err.message);
         }
     });
 }
+
+
+
 
 // -----------------------------
 // Load local .txt dataset
@@ -601,37 +663,26 @@ supabase.auth.onAuthStateChange((_event, _session) => {
 });
 
 window.addEventListener('DOMContentLoaded', async () => {
-    // Update sign-in button visibility at startup
     await refreshSignInUI();
-
     const docId = new URLSearchParams(window.location.search).get("id");
     if (!docId) return;
 
     try {
-        const doc = await loadDocumentById(docId);
-        if (!doc) {
-            alert("Documento no encontrado.");
-            window.location.href = "../Viewer/view.html";
-            return;
-        }
-
+        const doc = await loadDocumentByIdOnline(docId);
         const user = await getCurrentUser();
 
         if (!user || user.email !== doc.creator) {
-            alert("No tienes la autorización para editar este documento, enviandote a la versión de vista...");
+            alert("No puedes editar este documento. Abriendo en modo visor...");
             window.location.href = `../Viewer/view.html?id=${docId}`;
             return;
         }
-
-        // Populate editor with content
-        if (doc.content) populateEditorWithContent(doc.content);
-
     } catch (err) {
-        console.error("Failed to load document:", err);
-        alert("Ha ocurrido un error cargando el documento, redirigiendote a la versión de vista...");
+        console.error(err);
+        alert("Error cargando el documento. Abriendo en visor...");
         window.location.href = `../Viewer/view.html?id=${docId}`;
     }
 });
+
 
 //---------------------
 // Return home button

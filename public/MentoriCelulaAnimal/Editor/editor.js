@@ -74,7 +74,7 @@ function renderUser(user) {
     if (!userDiv) return;
     if (user) {
         userDiv.innerHTML = `
-      <span style="color:white; margin-right: 10px;">${user.email ?? ""}</span>
+      <span style="color:black; margin-right: 10px;">${user.email ?? ""}</span>
       <button id="logout">Cerrar sesión</button>
     `;
         document.getElementById("logout")?.addEventListener("click", logout);

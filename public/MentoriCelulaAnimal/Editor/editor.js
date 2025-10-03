@@ -598,53 +598,63 @@ async function loadDocumentById(id) {
     };
 }
 
-// -----------------------------
-// Copy button (create duplicate doc)
-// -----------------------------
-if (copyBtn) {
-    copyBtn.addEventListener('click', async () => {
-        const content = gatherEditorContent();
-        const user = await getCurrentUser();
-        if (!user) { alert('Debes iniciar sesión para copiar.'); return; }
-        try {
-            const newId = await createDocumentAndAssets(content);
-            window.open(`/MentoriCelulaAnimal/Editor/editor.html?id=${newId}`, '_blank');
-        } catch (err) {
-            console.error("Copy error:", err);
-            alert('Error al copiar: ' + (err.message || JSON.stringify(err)));
-        }
-    });
-}
+// =======================
+// EVENT HANDLERS
+// =======================
+const saveonlinebutton = document.getElementById("save-online-btn");
+const copyBtn = document.getElementById("copybtn");
 
-// -----------------------------
-// SAVE ONLINE (create or update)
-// -----------------------------
+// --- SAVE ONLINE ---
 if (saveonlinebutton) {
-    saveonlinebutton.addEventListener('click', async () => {
-        const content = gatherEditorContent();
-        const docId = new URLSearchParams(window.location.search).get('id');
-        try {
-            const user = await getCurrentUser();
-            if (!user) return alert("Debes iniciar sesión para guardar en línea.");
+    saveonlinebutton.addEventListener("click", async () => {
+        console.log("💾 Save Online button clicked");
 
-            if (docId) {
-                const loaded = await loadDocumentById(docId); // to check creator
-                if (!loaded) return alert("No se encontró el documento.");
-                if (loaded.creator !== user.email) return alert("No eres el creador del documento.");
-                await updateDocumentAndAssets(docId, content);
-                alert("Documento actualizado!");
-            } else {
-                const newId = await createDocumentAndAssets(content);
-                alert("Documento guardado en línea!");
-                // navigate to new doc
-                window.location.href = `../Editor/editor.html?id=${newId}`;
+        const content = gatherEditorContent();
+        console.log("📦 Gathered editor content:", content);
+
+        try {
+            const docId = new URLSearchParams(window.location.search).get("id");
+            const savedId = await createDocumentAndAssets(content, docId);
+
+            if (savedId) {
+                alert("✅ Document saved online!");
+                console.log("🔗 Saved document ID:", savedId);
             }
         } catch (err) {
-            console.error("Save online error:", err);
-            alert("Error al guardar en línea: " + (err.message || JSON.stringify(err)));
+            console.error("❌ Save failed:", err);
+            alert("Save failed, check console");
         }
     });
+} else {
+    console.error("❌ Save Online button NOT found in DOM");
 }
+
+// --- COPY LINK ---
+if (copyBtn) {
+    copyBtn.addEventListener("click", async () => {
+        console.log("📋 Copy button clicked");
+
+        const docId = new URLSearchParams(window.location.search).get("id");
+        if (!docId) {
+            alert("❌ No document ID found in URL");
+            return;
+        }
+
+        const shareUrl = `${window.location.origin}/editor.html?id=${docId}`;
+        console.log("🔗 Share URL generated:", shareUrl);
+
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            alert("✅ Link copied to clipboard!");
+        } catch (err) {
+            console.error("❌ Clipboard write failed:", err);
+            alert("Failed to copy link. Try manually: " + shareUrl);
+        }
+    });
+} else {
+    console.error("❌ Copy button NOT found in DOM");
+}
+
 
 // -----------------------------
 // Local load from .txt/.json

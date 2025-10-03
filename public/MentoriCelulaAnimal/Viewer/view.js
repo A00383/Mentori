@@ -26,6 +26,7 @@ const mainorganelname = document.getElementById('organelo');
 const organelos = document.querySelectorAll('.organelos');
 
 const savebtn = document.getElementById("savebtn");
+const switchviewbtn = document.getElementById("switch-mode-btn");
 const saveonlinebutton = document.getElementById("save-online-btn");
 const loadInput = document.getElementById("mainload");
 const loadBtn = document.getElementById("loadbtn");
@@ -369,3 +370,16 @@ setupOrganelName(microtubulos, "Microtúbulos");
 setupOrganelName(mitocondrias, "Mitocondrias");
 setupOrganelName(lisosomas, "Lisosomas");
 setupOrganelName(aparatodegolgi, "Aparato de Golgi");
+
+if (switchviewbtn) {
+    switchviewbtn.addEventListener("click", () => {
+        const docId = new URLSearchParams(window.location.search).get("id");
+        if (!docId) {
+            alert("No se encontró un ID de documento. Guarda el documento antes de cambiar a modo visor.");
+            return;
+        }
+        const viewerUrl = `https://mentorigroup.com/MentoriCelulaAnimal/Editor/editor.html?id=${docId}`;
+        window.open(viewerUrl, "_blank"); // opens in new tab
+        // Or use window.location.href = viewerUrl; if you want to replace instead of opening
+    });
+}

@@ -492,15 +492,38 @@ async function createDocumentOnline() {
         updated_at: now
     };
 
-    console.log("Insert payload:", insertPayload); // debug log
+    console.log("Insert payload:", insertPayload);
 
-    const { data, error } = await supabase.from("documents").insert(insertPayload).select().single();
+    const { data, error } = await supabase
+        .from("documents")
+        .insert(insertPayload)
+        .select()
+        .single();
 
     if (error) throw error;
     console.log("Inserted doc:", data);
 
     return data.id;
 }
+
+async function updateDocumentOnline(documentId) {
+    const user = await getCurrentUser();
+    if (!user) throw new Error("Usuario no autenticado");
+
+    const now = new Date().toISOString();
+
+    const { error } = await supabase
+        .from("documents")
+        .update({
+            updated_at: now,
+            creator: user.email ?? "",   // keep consistent
+            owner_id: user.id ?? null    // keep consistent
+        })
+        .eq("id", documentId);
+
+    if (error) throw error;
+}
+
 
 
 

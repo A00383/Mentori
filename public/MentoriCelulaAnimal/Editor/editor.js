@@ -30,9 +30,7 @@ const mainorganelname = document.getElementById('organelo');
 const copyBtn = document.getElementById('copybtn');
 const returnHomeBtn = document.getElementById("return-homebtn");
 const signInBtn = document.getElementById("sign-in");
-const userDiv = document.getElementById("user"); // <-- for login/logout U
-const organelleSections = document.querySelectorAll(".organelos");
-// I
+const userDiv = document.getElementById("user"); // <-- for login/logout UI
 
 // Organelles (may be null if not present)
 const membranacelular = document.getElementById('membrana celular');
@@ -86,19 +84,6 @@ function renderUser(user) {
         document.getElementById("login")?.addEventListener("click", login);
     }
 }
-
-// -----------------------------
-// Get current user (auth helper)
-// -----------------------------
-async function getCurrentUser() {
-    const { data, error } = await supabase.auth.getUser();
-    if (error) {
-        console.error("getCurrentUser error:", error);
-        return null;
-    }
-    return data?.user ?? null;
-}
-
 
 
 (async () => {
@@ -472,131 +457,51 @@ if (savebtn) {
     });
 }
 
-async function updateDocumentOnline(documentId) {
+// -----------------------------
+// Supabase Online Save & Load helpers
+// -----------------------------
+async function getCurrentUser() {
+    const { data } = await supabase.auth.getSession();
+    return data?.session?.user ?? null;
+}
+
+async function createDocument(editorContent) {
     const user = await getCurrentUser();
-    if (!user) throw new Error("❌ Usuario no autenticado");
+    if (!user) throw new Error('Must be logged-in to save document');
 
+    const id = nanoid();
     const now = new Date().toISOString();
-
-    const { error } = await supabase
-        .from("documents")
-        .update({
-            updated_at: now,
-            creator: user.email ?? "",
-            owner_id: user.id ?? null
-        })
-        .eq("id", documentId);
+    const { error } = await supabase.from('documents').insert({
+        id,
+        creator: user.email,
+        created_at: now,
+        updated_at: now,
+        content: editorContent
+    });
 
     if (error) throw error;
-
-    // 🔑 Save organelles + images separately
-    await saveOrganellesAndImages(documentId);
+    return id;
 }
 
+async function updateDocument(id, editorContent) {
+    const now = new Date().toISOString();
+    const { error } = await supabase.from('documents')
+        .update({ content: editorContent, updated_at: now })
+        .eq('id', id);
 
-async function saveOrganellesAndImages(documentId) {
-    const organelleSections = document.querySelectorAll(".organelos");
-
-    for (let section of organelleSections) {
-        const name = section.dataset.organelle || section.id;
-        const content = section.dataset.content || "";
-
-        // Upsert organelle
-        const { data: organelle, error: orgErr } = await supabase.from("organelles")
-            .upsert({
-                document_id: documentId,
-                name,
-                content,
-                updated_at: new Date()
-            }, { onConflict: "document_id,name" })
-            .select()
-            .single();
-
-        if (orgErr) {
-            console.error("Error saving organelle:", orgErr);
-            continue;
-        }
-
-        // ✅ Save images
-        const imgs = section.querySelectorAll("img");
-        for (let img of imgs) {
-            let imageUrl = img.src;
-
-            // If it's a base64 Data URL → upload to Supabase Storage
-            if (imageUrl.startsWith("data:")) {
-                try {
-                    const filePath = `${documentId}/${organelle.id}/${Date.now()}.png`;
-
-                    // Convert base64 to Blob
-                    const response = await fetch(imageUrl);
-                    const blob = await response.blob();
-
-                    const { error: uploadError } = await supabase.storage
-                        .from("images") // your storage bucket name
-                        .upload(filePath, blob, { upsert: true });
-
-                    if (uploadError) throw uploadError;
-
-                    // Get public URL
-                    const { data: publicUrlData } = supabase.storage
-                        .from("images")
-                        .getPublicUrl(filePath);
-
-                    imageUrl = publicUrlData.publicUrl;
-                } catch (e) {
-                    console.error("Image upload failed:", e);
-                    continue;
-                }
-            }
-
-            // Save only the URL in DB
-            const { error: imgErr } = await supabase.from("images").upsert({
-                document_id: documentId,
-                organelle_id: organelle.id,
-                url: imageUrl
-            }, { onConflict: "organelle_id,url" });
-
-            if (imgErr) console.error("Error saving image:", imgErr);
-        }
-    }
-
-    // ✅ Handle "main images" (outside organelles)
-    const mainImgs = [...(mainimagesContainer?.querySelectorAll("img") || [])];
-    for (let img of mainImgs) {
-        let imageUrl = img.src;
-
-        if (imageUrl.startsWith("data:")) {
-            try {
-                const filePath = `${documentId}/main/${Date.now()}.png`;
-
-                const response = await fetch(imageUrl);
-                const blob = await response.blob();
-
-                const { error: uploadError } = await supabase.storage
-                    .from("images")
-                    .upload(filePath, blob, { upsert: true });
-
-                if (uploadError) throw uploadError;
-
-                const { data: publicUrlData } = supabase.storage
-                    .from("images")
-                    .getPublicUrl(filePath);
-
-                imageUrl = publicUrlData.publicUrl;
-            } catch (e) {
-                console.error("Main image upload failed:", e);
-                continue;
-            }
-        }
-
-        await supabase.from("images").upsert({
-            document_id: documentId,
-            url: imageUrl
-        }, { onConflict: "document_id,url" });
-    }
+    if (error) throw error;
+    return true;
 }
 
+async function loadDocumentById(id) {
+    const { data, error } = await supabase.from('documents')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
 
+    if (error) throw error;
+    return data;
+}
 
 // ------------------------------
 // Copy Button
@@ -629,29 +534,32 @@ if (copyBtn) {
 // -----------------------------
 if (saveonlinebutton) {
     saveonlinebutton.addEventListener("click", async () => {
+        const content = gatherEditorContent();
         const docId = new URLSearchParams(window.location.search).get("id");
+
         try {
             const user = await getCurrentUser();
-            if (!user) return alert("Debes haber iniciado sesión.");
+            if (!user) return alert("Debes estar en una cuenta para poder guardar en linea.");
 
             if (docId) {
-                await updateDocumentOnline(docId);
-                alert("Documento actualizado!");
+                const doc = await loadDocumentById(docId);
+                if (!doc) return alert("No se encontro el documento.");
+                if (doc.creator !== user.email) return alert("Tú no eres el creador de este documento.");
+
+                await updateDocument(docId, content);
+                alert("Documento guardado exitosamente!");
             } else {
-                const newId = await createDocumentOnline();
-                await saveOrganellesAndImages(newId);
-                alert("Documento guardado en línea!");
+                const newId = await createDocument(content);
+                alert("Documento guardado exitosamente!");
+                // Redirect using absolute path from root
                 window.location.href = `../Editor/editor.html?id=${newId}`;
             }
         } catch (err) {
             console.error(err);
-            alert("Error al guardar en línea: " + err.message);
+            alert("Error al guardar el documento: " + err.message);
         }
     });
 }
-
-
-
 
 // -----------------------------
 // Load local .txt dataset
@@ -686,110 +594,62 @@ async function refreshSignInUI() {
     }
 }
 
-// =======================
-// AUTH STATE HANDLING
-// =======================
+// Listen to auth state changes so UI updates instantly on sign in/out
 supabase.auth.onAuthStateChange((_event, _session) => {
-    refreshSignInUI().catch(err => console.error("refreshSignInUI error", err));
+    refreshSignInUI().catch(err => console.error('refreshSignInUI error', err));
 });
 
-// =======================
-// NORMALIZED LOADER (FINAL)
-// =======================
-async function tryLoadNormalizedWithRetry(docId, retries = 3, delayMs = 500) {
-    for (let attempt = 1; attempt <= retries; attempt++) {
-        try {
-            console.log(`🔄 Normalized attempt ${attempt}/${retries}`);
+window.addEventListener('DOMContentLoaded', async () => {
+    // Update sign-in button visibility at startup
+    await refreshSignInUI();
 
-            // Query main document
-            const { data: docs, error: docErr } = await supabase
-                .from("documents")
-                .select("*")
-                .eq("id", docId)
-                .limit(1);
+    const docId = new URLSearchParams(window.location.search).get("id");
+    if (!docId) return;
 
-            if (docErr) throw new Error(`Supabase error [documents]: ${docErr.message}`);
-
-            const doc = docs?.[0];
-            if (!doc) throw new Error("No normalized doc found");
-
-            // Query organelles
-            const { data: organelles, error: orgErr } = await supabase
-                .from("organelles")
-                .select("*")
-                .eq("document_id", docId);
-
-            if (orgErr) throw new Error(`Supabase error [organelles]: ${orgErr.message}`);
-
-            // Query images
-            const { data: images, error: imgErr } = await supabase
-                .from("images")
-                .select("*")
-                .eq("document_id", docId);
-
-            if (imgErr) throw new Error(`Supabase error [images]: ${imgErr.message}`);
-
-            return { doc, organelles, images };
-        } catch (err) {
-            console.warn(`⚠️ Normalized load failed (attempt ${attempt}):`, err);
-
-            if (attempt < retries) {
-                await new Promise(res => setTimeout(res, delayMs));
-                continue; // retry
-            }
-
-            throw err; // rethrow final failure
+    try {
+        const doc = await loadDocumentById(docId);
+        if (!doc) {
+            alert("Documento no encontrado.");
+            window.location.href = "../Viewer/view.html";
+            return;
         }
+
+        const user = await getCurrentUser();
+
+        if (!user || user.email !== doc.creator) {
+            alert("No tienes la autorización para editar este documento, enviandote a la versión de vista...");
+            window.location.href = `../Viewer/view.html?id=${docId}`;
+            return;
+        }
+
+        // Populate editor with content
+        if (doc.content) populateEditorWithContent(doc.content);
+
+    } catch (err) {
+        console.error("Failed to load document:", err);
+        alert("Ha ocurrido un error cargando el documento, redirigiendote a la versión de vista...");
+        window.location.href = `../Viewer/view.html?id=${docId}`;
     }
+});
+
+//---------------------
+// Return home button
+//---------------------
+if (returnHomeBtn) {
+    returnHomeBtn.addEventListener("click", () => {
+        window.location.href = "/index.html";
+    });
 }
 
-
-// =======================
-// DOCUMENT LOADING
-// =======================
-window.addEventListener("DOMContentLoaded", async () => {
-    console.log("🔄 DOM ready, starting document load...");
-
-    try {
-        await refreshSignInUI();
-    } catch (err) {
-        console.error("⚠️ refreshSignInUI error:", err);
-    }
-
-    // --- Get docId ---
-    const params = new URLSearchParams(window.location.search);
-    const docId = params.get("id");
-
-    if (!docId) {
-        console.warn("⚠️ No docId in URL");
-        return;
-    }
-    console.log("📌 Document ID:", docId);
-
-    // --- Try normalized loader ---
-    try {
-        const { doc } = await tryLoadNormalizedWithRetry(docId);
-
-        if (doc?.content) {
-            populateEditorWithContent(doc.content);
-            console.log("✅ Loaded content:", doc.content);
-            return; // stop here if successful
-        }
-    } catch (err) {
-        console.error("❌ Failed normalized load:", err);
-    }
-
-    // --- Optional: Legacy fallback ---
-    try {
-        const legacyDoc = await loadDocumentById(docId);
-        if (legacyDoc?.content) {
-            populateEditorWithContent(legacyDoc.content);
-            console.log("✅ Loaded legacy content:", legacyDoc.content);
-        }
-    } catch (legacyErr) {
-        console.error("❌ Failed legacy load:", legacyErr);
-    }
-});
+// -----------------------------
+// Organelles hover + click names
+// -----------------------------
+function setupOrganelName(organel, displayName) {
+    if (!organel) return;
+    organel.addEventListener('click', () => { if (popupname) popupname.textContent = displayName; });
+    organel.addEventListener('mouseenter', () => { if (mainorganelname) mainorganelname.textContent = displayName; });
+    organel.addEventListener('mouseleave', () => { if (mainorganelname) mainorganelname.textContent = "Célula animal"; });
+}
 
 setupOrganelName(membranacelular, "Membrana celular");
 setupOrganelName(ribosomas, "Ribosomas");
@@ -803,3 +663,29 @@ setupOrganelName(mitocondrias, "Mitocondrias");
 setupOrganelName(lisosomas, "Lisosomas");
 setupOrganelName(aparatodegolgi, "Aparato de Golgi");
 
+//serviceworker//
+
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (let registration of registrations) {
+            registration.unregister();
+            console.log("Unregistered service worker:", registration);
+        }
+    });
+}
+
+// ------------------------------
+// Switch to Viewer Mode
+// ------------------------------
+if (switchviewbtn) {
+    switchviewbtn.addEventListener("click", () => {
+        const docId = new URLSearchParams(window.location.search).get("id");
+        if (!docId) {
+            alert("No se encontró un ID de documento. Guarda el documento antes de cambiar a modo visor.");
+            return;
+        }
+        const viewerUrl = `https://mentorigroup.com/MentoriCelulaAnimal/Viewer/view.html?id=${docId}`;
+        window.open(viewerUrl, "_blank"); // opens in new tab
+        // Or use window.location.href = viewerUrl; if you want to replace instead of opening
+    });
+}

@@ -471,37 +471,153 @@ async function createDocument(editorContent) {
 
     const id = nanoid();
     const now = new Date().toISOString();
-    const { error } = await supabase.from('documents').insert({
-        id,
-        creator: user.email,
-        created_at: now,
-        updated_at: now,
-        content: editorContent
-    });
 
-    if (error) throw error;
+    // Insert base document
+    const { error: docErr } = await supabase.from('documents').insert({
+        id,
+        title: "Untitled",
+        description: editorContent.description || "",
+        creator: user.email,
+        owner_id: user.id,
+        created_at: now,
+        updated_at: now
+    });
+    if (docErr) throw docErr;
+
+    // Insert organelles
+    for (const organelle of (editorContent.organelos || [])) {
+        const { data: organelleRow, error: orgErr } = await supabase
+            .from('organelles')
+            .insert({
+                document_id: id,
+                name: organelle.id,
+                content: organelle.content || ""
+            })
+            .select()
+            .single();
+        if (orgErr) throw orgErr;
+
+        // Insert images linked to organelle
+        for (const url of organelle.image || []) {
+            const { error: imgErr } = await supabase.from('images').insert({
+                organelle_id: organelleRow.id,
+                url
+            });
+            if (imgErr) throw imgErr;
+        }
+    }
+
+    // Insert main images (linked only to document)
+    for (const url of (editorContent.mainImages || [])) {
+        const { error: imgErr } = await supabase.from('images').insert({
+            document_id: id,
+            url
+        });
+        if (imgErr) throw imgErr;
+    }
+
     return id;
 }
 
+
 async function updateDocument(id, editorContent) {
     const now = new Date().toISOString();
-    const { error } = await supabase.from('documents')
-        .update({ content: editorContent, updated_at: now })
-        .eq('id', id);
 
-    if (error) throw error;
+    // Update document description
+    const { error: docErr } = await supabase.from('documents')
+        .update({
+            description: editorContent.description || "",
+            updated_at: now
+        })
+        .eq('id', id);
+    if (docErr) throw docErr;
+
+    // Clear existing organelles & images (simple strategy)
+    await supabase.from('organelles').delete().eq('document_id', id);
+    await supabase.from('images').delete().eq('document_id', id);
+
+    // Reinsert fresh data
+    for (const organelle of (editorContent.organelos || [])) {
+        const { data: organelleRow, error: orgErr } = await supabase
+            .from('organelles')
+            .insert({
+                document_id: id,
+                name: organelle.id,
+                content: organelle.content || ""
+            })
+            .select()
+            .single();
+        if (orgErr) throw orgErr;
+
+        for (const url of organelle.image || []) {
+            const { error: imgErr } = await supabase.from('images').insert({
+                organelle_id: organelleRow.id,
+                url
+            });
+            if (imgErr) throw imgErr;
+        }
+    }
+
+    for (const url of (editorContent.mainImages || [])) {
+        const { error: imgErr } = await supabase.from('images').insert({
+            document_id: id,
+            url
+        });
+        if (imgErr) throw imgErr;
+    }
+
     return true;
 }
 
+
 async function loadDocumentById(id) {
-    const { data, error } = await supabase.from('documents')
+    // Load document
+    const { data: doc, error: docErr } = await supabase
+        .from('documents')
         .select('*')
         .eq('id', id)
         .maybeSingle();
+    if (docErr) throw docErr;
 
-    if (error) throw error;
-    return data;
+    // Load organelles
+    const { data: organelles, error: orgErr } = await supabase
+        .from('organelles')
+        .select('*')
+        .eq('document_id', id);
+    if (orgErr) throw orgErr;
+
+    // Load images
+    const { data: images, error: imgErr } = await supabase
+        .from('images')
+        .select('*')
+        .eq('document_id', id);
+    if (imgErr) throw imgErr;
+
+    // Load images linked to organelles
+    const organelleImages = {};
+    for (const organelle of organelles) {
+        const { data: imgs } = await supabase
+            .from('images')
+            .select('*')
+            .eq('organelle_id', organelle.id);
+        organelleImages[organelle.name] = imgs || [];
+    }
+
+    // Reconstruct old format so `populateEditorWithContent` still works
+    return {
+        ...doc,
+        content: {
+            description: doc.description,
+            mainImages: images.map(i => i.url),
+            organelos: organelles.map(o => ({
+                id: o.name,
+                content: o.content,
+                image: (organelleImages[o.name] || []).map(i => i.url)
+            }))
+        }
+    };
 }
+
 
 // ------------------------------
 // Copy Button

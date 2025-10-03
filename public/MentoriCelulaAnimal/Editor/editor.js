@@ -732,30 +732,36 @@ supabase.auth.onAuthStateChange((_event, _session) => {
 window.addEventListener("DOMContentLoaded", async () => {
     console.log("🔄 DOM ready, starting document load...");
 
+    // --- Refresh Sign In UI ---
     try {
         await refreshSignInUI();
     } catch (err) {
-        console.error("⚠️ refreshSignInUI error", err);
+        console.error("⚠️ refreshSignInUI error:", err);
     }
 
+    // --- Get document ID from URL ---
     const docId = new URLSearchParams(window.location.search).get("id");
     if (!docId) {
         console.warn("⚠️ No docId in URL");
         return;
     }
+    console.log("📌 Document ID:", docId);
 
+    // --- Get current user ---
     let user = null;
     try {
         user = await getCurrentUser();
-        console.log("✅ Current user:", user?.email);
+        console.log("✅ Current user:", user?.email || "(none)");
     } catch (err) {
         console.warn("⚠️ Failed to get user:", err);
     }
 
     // ---------- Try normalized schema ----------
     try {
+        console.log("🔎 Trying normalized loader...");
         const { doc, organelles } = await tryLoadNormalizedWithRetry(docId, 6, 400);
-        console.log("📄 Normalized document:", doc);
+        console.log("📄 Normalized document result:", doc);
+        console.log("🧩 Normalized organelles:", organelles);
 
         if (doc) {
             if (!user || user.email !== doc.creator) {
@@ -764,7 +770,7 @@ window.addEventListener("DOMContentLoaded", async () => {
                 return;
             }
 
-            // Fill title + description (safe lookup)
+            // Fill title
             const titleElem = document.getElementById("document-title");
             if (titleElem) {
                 titleElem.innerText = doc.title || "Untitled";
@@ -772,6 +778,7 @@ window.addEventListener("DOMContentLoaded", async () => {
                 console.warn("⚠️ Missing element: #document-title");
             }
 
+            // Fill description
             const descElem = document.getElementById("description");
             if (descElem) {
                 descElem.value = doc.description || "";
@@ -792,17 +799,19 @@ window.addEventListener("DOMContentLoaded", async () => {
                 }
             });
 
-            return; // ✅ Loaded successfully
+            console.log("✅ Normalized document loaded successfully");
+            return;
         }
     } catch (normErr) {
-        console.error("❌ Normalized load error", normErr);
-        // Don’t redirect yet — try legacy
+        console.error("❌ Normalized load error:", normErr);
+        // don’t redirect yet — try legacy
     }
 
     // ---------- Fallback: legacy JSON ----------
     try {
+        console.log("🔎 Trying legacy loader...");
         const legacyDoc = await loadDocumentById(docId);
-        console.log("📄 Legacy document:", legacyDoc);
+        console.log("📄 Legacy document result:", legacyDoc);
 
         if (!legacyDoc) {
             alert("Documento no encontrado. Si acabas de crearlo, espera y recarga.");
@@ -816,17 +825,21 @@ window.addEventListener("DOMContentLoaded", async () => {
         }
 
         if (legacyDoc.content) {
+            console.log("📝 Populating editor with legacy content...");
             populateEditorWithContent(legacyDoc.content);
         } else {
-            console.warn("⚠️ Legacy doc has no content");
+            console.warn("⚠️ Legacy doc has no content field");
         }
+
+        console.log("✅ Legacy document loaded successfully");
         return;
     } catch (legacyErr) {
-        console.error("❌ Legacy load error", legacyErr);
+        console.error("❌ Legacy load error:", legacyErr);
         alert("Error cargando el documento. Abriendo en visor...");
         window.location.href = `../Viewer/view.html?id=${docId}`;
     }
 });
+
 
 
 

@@ -474,6 +474,7 @@ async function createDocument(editorContent) {
     const { error } = await supabase.from('documents').insert({
         id,
         creator: user.email,
+        owner_id: user.id,
         created_at: now,
         updated_at: now,
         content: editorContent

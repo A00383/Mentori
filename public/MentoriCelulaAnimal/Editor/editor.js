@@ -433,65 +433,52 @@ async function getCurrentUser() {
 // -----------------------------
 // CREATE document + organelles + images
 // -----------------------------
-async function createDocumentAndAssets(editorContent) {
+async function createDocumentAndAssets(editorContent, docId = null) {
     const user = await getCurrentUser();
-    if (!user) throw new Error("Must be logged in to create document");
+    console.log("👤 Current user:", user);
+    if (!user) {
+        alert("❌ Please login first");
+        return null;
+    }
 
-    const id = nanoid();
     const now = new Date().toISOString();
+    const id = docId || window.nanoid();
 
-    // insert document row (content saved too)
-    const { error: docErr } = await supabase.from('documents').insert({
+    console.log("📝 Attempting upsert with data:", {
         id,
+        title: "Célula animal",
+        description: editorContent.description,
+        content: editorContent,
         creator: user.email,
         owner_id: user.id,
         created_at: now,
         updated_at: now,
-        content: editorContent
     });
 
-    if (docErr) throw docErr;
+    const { error: docErr } = await supabase.from("documents").upsert(
+        {
+            id,
+            title: "Célula animal",
+            description: editorContent.description,
+            content: editorContent,
+            creator: user.email,
+            owner_id: user.id,
+            created_at: now,
+            updated_at: now,
+        },
+        { onConflict: "id" }
+    );
 
-    // create organelles & images
-    for (const organelle of (editorContent.organelos || [])) {
-        const { data: organelleRow, error: orgErr } = await supabase.from('organelles')
-            .insert({
-                document_id: id,
-                name: organelle.id || `org-${Date.now()}`,
-                content: organelle.content || ""
-            })
-            .select()
-            .single();
-        if (orgErr) throw orgErr;
-
-        for (const img of (organelle.images || organelle.image || [])) {
-            let finalUrl = img.src;
-            if (img.file) {
-                finalUrl = await uploadImage(img.file, img.name || `${organelleRow.id}-${Date.now()}.png`);
-            }
-            const { error: imgErr } = await supabase.from('images').insert({
-                organelle_id: organelleRow.id,
-                url: finalUrl
-            });
-            if (imgErr) throw imgErr;
-        }
+    if (docErr) {
+        console.error("❌ Document save failed:", docErr);
+        alert("Failed to save document: " + docErr.message);
+        return null;
     }
 
-    // main images
-    for (const mi of (editorContent.mainImages || [])) {
-        let finalUrl = mi.src;
-        if (mi.file) {
-            finalUrl = await uploadImage(mi.file, mi.name || `main-${Date.now()}.png`);
-        }
-        const { error: imgErr } = await supabase.from('images').insert({
-            document_id: id,
-            url: finalUrl
-        });
-        if (imgErr) throw imgErr;
-    }
-
+    console.log("✅ Document saved!");
     return id;
 }
+
 
 // -----------------------------
 // UPDATE document + assets (clear & reinsert)

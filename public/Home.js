@@ -157,9 +157,6 @@ async function listUserDocs() {
     });
 }
 
-// =======================
-// CREATE NEW FILE
-// =======================
 createBtn.addEventListener("click", async () => {
     const { data: { session } } = await supabase.auth.getSession();
     const user = session?.user;
@@ -171,8 +168,8 @@ createBtn.addEventListener("click", async () => {
             .insert([{
                 id: newId,
                 creator: user.email,
-                title: "Untitled Document",   // ✅ title
-                content: {}
+                owner_id: user.id,              // ✅ added
+                title: "Untitled Document"
             }])
             .select()
             .single();

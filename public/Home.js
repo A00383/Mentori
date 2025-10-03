@@ -185,9 +185,6 @@ createBtn.addEventListener("click", async () => {
     }
 });
 
-// =======================
-// GENERAL SHARE BUTTON
-// =======================
 document.addEventListener("DOMContentLoaded", () => {
     const sharePopup = document.getElementById("general-share-pop-up");
     const shareBtn = document.getElementById("general-celula-animal-share-button");
@@ -202,6 +199,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
         closeShareBtn.addEventListener("click", () => {
             sharePopup.classList.remove("active");
+        });
+
+        // Close popup when clicking outside of it
+        document.addEventListener("click", (event) => {
+            const isClickInsidePopup = sharePopup.contains(event.target);
+            const isClickOnButton = shareBtn.contains(event.target);
+
+            if (!isClickInsidePopup && !isClickOnButton) {
+                sharePopup.classList.remove("active");
+            }
         });
     }
 

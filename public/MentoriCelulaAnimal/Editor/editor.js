@@ -546,10 +546,10 @@ if (saveonlinebutton) {
                 if (doc.creator !== user.email) return alert("Tú no eres el creador de este documento.");
 
                 await updateDocument(docId, content);
-                alert("Document saved successfully!");
+                alert("Documento guardado exitosamente!");
             } else {
                 const newId = await createDocument(content);
-                alert("New document created successfully!");
+                alert("Documento guardado exitosamente!");
                 // Redirect using absolute path from root
                 window.location.href = `../Editor/editor.html?id=${newId}`;
             }

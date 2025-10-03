@@ -73,7 +73,7 @@ async function listUserDocs() {
 
     const { data, error } = await supabase
         .from("documents")
-        .select("id, name, created_at, updated_at")
+        .select("id, title, created_at, updated_at")   // ✅ use title
         .eq("creator", user.email)
         .order("updated_at", { ascending: false });
 
@@ -85,17 +85,14 @@ async function listUserDocs() {
     container.innerHTML = "";
 
     data.forEach(doc => {
-        // Create project card
         const card = document.createElement("div");
         card.classList.add("project-card");
         card.id = doc.id;
 
-        // Project title
         const title = document.createElement("div");
         title.classList.add("project-title");
-        title.textContent = doc.name || doc.id;
+        title.textContent = doc.title || doc.id;   // ✅ use title
 
-        // Project thumbnail
         const thumbnail = document.createElement("img");
         thumbnail.classList.add("project-thumbnail");
         thumbnail.src = "https://via.placeholder.com/220x140?text=Thumbnail";
@@ -104,12 +101,11 @@ async function listUserDocs() {
         card.appendChild(thumbnail);
         card.appendChild(title);
 
-        // Add click handler to open editor
         card.addEventListener("click", () => {
             window.location.href = `MentoriCelulaAnimal/Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
         });
 
-        // --- Actions container (Rename / Delete) ---
+        // Actions container
         const actions = document.createElement("div");
         actions.style.display = "flex";
         actions.style.justifyContent = "space-between";
@@ -120,21 +116,21 @@ async function listUserDocs() {
         renameBtn.textContent = "Renombrar";
         renameBtn.addEventListener("click", async (e) => {
             e.stopPropagation();
-            const newName = prompt("Enter new name for this document:", doc.name || "");
-            if (newName) {
+            const newTitle = prompt("Enter new title for this document:", doc.title || "");
+            if (newTitle) {
                 const { error: updateError } = await supabase
                     .from("documents")
-                    .update({ name: newName, updated_at: new Date().toISOString() })
+                    .update({ title: newTitle, updated_at: new Date().toISOString() })  // ✅ title
                     .eq("id", doc.id);
                 if (updateError) {
                     console.error("Rename error:", updateError);
                 } else {
-                    title.textContent = newName;
+                    title.textContent = newTitle;
                 }
             }
         });
 
-        // Delete button
+        // Delete button (unchanged)
         const deleteBtn = document.createElement("button");
         deleteBtn.textContent = "Borrar";
         deleteBtn.style.color = "red";
@@ -157,7 +153,6 @@ async function listUserDocs() {
         actions.appendChild(deleteBtn);
         card.appendChild(actions);
 
-        // Append card to container
         container.appendChild(card);
     });
 }
@@ -176,8 +171,8 @@ createBtn.addEventListener("click", async () => {
             .insert([{
                 id: newId,
                 creator: user.email,
-                name: "Untitled Document",
-                content: ""
+                title: "Untitled Document",   // ✅ title
+                content: {}
             }])
             .select()
             .single();
@@ -190,39 +185,5 @@ createBtn.addEventListener("click", async () => {
         window.location.href = `MentoriCelulaAnimal/Editor/editor.html?id=${encodeURIComponent(doc.id)}`;
     } else {
         window.location.href = "https://mentorigroup.com/MentoriCelulaAnimal/Editor/editor.html";
-    }
-});
-
-// =======================
-// GENERAL SHARE BUTTON
-// =======================
-document.addEventListener("DOMContentLoaded", () => {
-    const sharePopup = document.getElementById("general-share-pop-up");
-    const shareBtn = document.getElementById("general-celula-animal-share-button");
-    const closeShareBtn = document.getElementById("general-share-pop-up-close-button");
-    const copyBtn = document.getElementById("general-share-pop-up-copy-button");
-    const urlDiv = document.getElementById("general-share-pop-up-url");
-
-    if (shareBtn && sharePopup && closeShareBtn) {
-        shareBtn.addEventListener("click", () => {
-            sharePopup.classList.add("active");
-        });
-
-        closeShareBtn.addEventListener("click", () => {
-            sharePopup.classList.remove("active");
-        });
-    }
-
-    if (copyBtn && urlDiv) {
-        copyBtn.addEventListener("click", async () => {
-            const textToCopy = urlDiv.textContent.trim();
-            try {
-                await navigator.clipboard.writeText(textToCopy);
-                copyBtn.textContent = "✔";
-                setTimeout(() => (copyBtn.textContent = "Copiar link"), 1500);
-            } catch (err) {
-                console.error("Failed to copy: ", err);
-            }
-        });
     }
 });

@@ -178,7 +178,11 @@ document.querySelectorAll('.pop-up-image').forEach(attachPopupImageBehavior);
 function gatherEditorContent() {
     const savedataexport = {
         description: document.getElementById("description")?.value || "",
-        mainImages: [...(mainimagesContainer?.querySelectorAll("img") || [])].map(img => img.src),
+        mainImages: [...(mainimagesContainer?.querySelectorAll("img") || [])].map((img, i) => ({
+            file: img.dataset.file || null,   // <-- file object stored in dataset
+            src: img.src,                     // preview
+            name: `main-${i}-${Date.now()}.png` // unique filename
+        })),
         organelos: []
     };
 
@@ -197,7 +201,11 @@ function gatherEditorContent() {
         savedataexport.organelos.push({
             id,
             content,
-            image: imagesArray
+            image: imagesArray.map((src, i) => ({
+                file: null,  // later we’ll assign if uploaded
+                src,
+                name: `${id}-img-${i}-${Date.now()}.png`
+            }))
         });
     });
 

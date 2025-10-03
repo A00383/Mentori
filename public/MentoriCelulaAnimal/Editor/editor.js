@@ -694,7 +694,7 @@ supabase.auth.onAuthStateChange((_event, _session) => {
 });
 
 // =======================
-// NORMALIZED LOADER
+// NORMALIZED LOADER (FINAL)
 // =======================
 async function tryLoadNormalizedWithRetry(docId, retries = 3, delayMs = 500) {
     for (let attempt = 1; attempt <= retries; attempt++) {
@@ -713,17 +713,23 @@ async function tryLoadNormalizedWithRetry(docId, retries = 3, delayMs = 500) {
             const doc = docs?.[0];
             if (!doc) throw new Error("No normalized doc found");
 
-            // Query organelles (assuming table: document_organelles)
-// CORRECT
+            // Query organelles
             const { data: organelles, error: orgErr } = await supabase
                 .from("organelles")
                 .select("*")
                 .eq("document_id", docId);
 
-
             if (orgErr) throw new Error(`Supabase error [organelles]: ${orgErr.message}`);
 
-            return { doc, organelles };
+            // Query images
+            const { data: images, error: imgErr } = await supabase
+                .from("images")
+                .select("*")
+                .eq("document_id", docId);
+
+            if (imgErr) throw new Error(`Supabase error [images]: ${imgErr.message}`);
+
+            return { doc, organelles, images };
         } catch (err) {
             console.warn(`⚠️ Normalized load failed (attempt ${attempt}):`, err);
 
@@ -735,31 +741,6 @@ async function tryLoadNormalizedWithRetry(docId, retries = 3, delayMs = 500) {
             throw err; // rethrow final failure
         }
     }
-}
-// =======================
-// LEGACY LOADER
-// =======================
-async function tryLoadNormalizedWithRetry(docId) {
-    const { data: docs } = await supabase
-        .from("documents")
-        .select("*")
-        .eq("id", docId)
-        .limit(1);
-
-    const doc = docs?.[0];
-    if (!doc) throw new Error("No doc found");
-
-    const { data: organelles } = await supabase
-        .from("organelles")
-        .select("*")
-        .eq("document_id", docId);
-
-    const { data: images } = await supabase
-        .from("images")
-        .select("*")
-        .eq("document_id", docId);
-
-    return { doc, organelles, images };
 }
 
 

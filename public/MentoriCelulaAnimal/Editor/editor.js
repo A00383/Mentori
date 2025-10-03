@@ -30,7 +30,9 @@ const mainorganelname = document.getElementById('organelo');
 const copyBtn = document.getElementById('copybtn');
 const returnHomeBtn = document.getElementById("return-homebtn");
 const signInBtn = document.getElementById("sign-in");
-const userDiv = document.getElementById("user"); // <-- for login/logout UI
+const userDiv = document.getElementById("user"); // <-- for login/logout U
+const organelleSections = document.querySelectorAll(".organelos");
+// I
 
 // Organelles (may be null if not present)
 const membranacelular = document.getElementById('membrana celular');

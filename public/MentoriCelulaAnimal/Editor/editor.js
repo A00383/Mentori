@@ -491,9 +491,12 @@ async function createDocumentOnline() {
 }
 
 async function saveOrganellesAndImages(documentId) {
-    const organelleSections = document.querySelectorAll("[data-organelle]");
+    // ✅ match your HTML structure
+    const organelleSections = document.querySelectorAll(".organelos");
+
     for (let section of organelleSections) {
-        const name = section.dataset.organelle;
+        // ✅ use dataset.organelle OR fallback to id
+        const name = section.dataset.organelle || section.id;
         const content = section.dataset.content || "";
 
         // upsert organelle
@@ -520,7 +523,7 @@ async function saveOrganellesAndImages(documentId) {
         }
     }
 
-    // Save main images
+    // Save main images (outside organelles)
     const mainImgs = [...(mainimagesContainer?.querySelectorAll("img") || [])].map(img => img.src);
     for (let src of mainImgs) {
         await supabase.from("images").upsert({
@@ -529,6 +532,7 @@ async function saveOrganellesAndImages(documentId) {
         }, { onConflict: "document_id,url" });
     }
 }
+
 
 async function updateDocumentOnline(docId) {
     const now = new Date().toISOString();

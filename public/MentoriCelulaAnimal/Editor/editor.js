@@ -541,32 +541,41 @@ async function updateDocumentOnline(docId) {
     await saveOrganellesAndImages(docId);
 }
 
-async function loadDocumentByIdOnline(id) {
-    const { data: doc, error } = await supabase.from("documents")
-        .select("*").eq("id", id).single();
-    if (error) throw error;
-
-    // load organelles + images
-    const { data: organelles } = await supabase.from("organeles")
-        .select("*, images(*)")
-        .eq("document_id", id);
-
-    // apply to UI
-    if (doc) {
-        document.getElementById("document-title").innerText = doc.title || "Untitled";
-        document.getElementById("description").value = doc.description || "";
-    }
-    if (organelles) {
-        organelles.forEach(organelle => {
-            const section = document.querySelector(`[data-organelle="${organelle.name}"]`);
-            if (section) {
-                section.dataset.content = organelle.content || "";
-                section.dataset.image = JSON.stringify((organelle.images || []).map(i => i.url));
-            }
-        });
-    }
-    return doc;
+function sleep(ms) {
+    return new Promise(res => setTimeout(res, ms));
 }
+
+async function loadDocumentByIdOnline(id) {
+    try {
+        const { data: doc, error: docErr } = await supabase
+            .from("documents")
+            .select("*")
+            .eq("id", id)
+            .maybeSingle();
+        if (docErr) throw docErr;
+
+        const { data: organelles, error: orgErr } = await supabase
+            .from("organeles")
+            .select("*, images(*)")
+            .eq("document_id", id);
+        if (orgErr) throw orgErr;
+
+        return { doc: doc ?? null, organelles: organelles ?? [] };
+    } catch (err) {
+        console.warn("loadDocumentByIdOnline failed:", err);
+        return { doc: null, organelles: [] };
+    }
+}
+
+async function tryLoadNormalizedWithRetry(id, attempts = 6, delayMs = 400) {
+    for (let i = 0; i < attempts; i++) {
+        const result = await loadDocumentByIdOnline(id);
+        if (result.doc) return result;
+        await sleep(delayMs);
+    }
+    return await loadDocumentByIdOnline(id);
+}
+
 
 
 // ------------------------------
@@ -662,23 +671,70 @@ supabase.auth.onAuthStateChange((_event, _session) => {
     refreshSignInUI().catch(err => console.error('refreshSignInUI error', err));
 });
 
-window.addEventListener('DOMContentLoaded', async () => {
+window.addEventListener("DOMContentLoaded", async () => {
     await refreshSignInUI();
     const docId = new URLSearchParams(window.location.search).get("id");
     if (!docId) return;
 
+    let user = null;
     try {
-        const doc = await loadDocumentByIdOnline(docId);
-        const user = await getCurrentUser();
+        user = await getCurrentUser();
+    } catch (err) {
+        console.warn("Failed to get user:", err);
+    }
 
-        if (!user || user.email !== doc.creator) {
-            alert("No puedes editar este documento. Abriendo en modo visor...");
+    try {
+        // First: try normalized schema with retry (covers new docs just created)
+        const { doc, organelles } = await tryLoadNormalizedWithRetry(docId, 6, 400);
+
+        if (doc) {
+            if (!user || user.email !== doc.creator) {
+                alert("No puedes editar este documento. Abriendo en modo visor...");
+                window.location.href = `../Viewer/view.html?id=${docId}`;
+                return;
+            }
+
+            const titleElem = document.getElementById("document-title");
+            if (titleElem) titleElem.innerText = doc.title || "Untitled";
+            const descElem = document.getElementById("description");
+            if (descElem) descElem.value = doc.description || "";
+
+            (organelles || []).forEach(o => {
+                let section = document.querySelector(`[data-organelle="${o.name}"]`);
+                if (!section) section = document.getElementById(o.name);
+                if (section) {
+                    section.dataset.content = o.content || "";
+                    section.dataset.image = JSON.stringify((o.images || []).map(i => i.url));
+                }
+            });
+            return;
+        }
+
+        // Fallback: legacy JSON content
+        try {
+            const legacyDoc = await loadDocumentById(docId); // your existing old loader
+            if (!legacyDoc) {
+                alert("Documento no encontrado. Si acabas de crearlo, espera y recarga.");
+                return;
+            }
+
+            if (!user || user.email !== legacyDoc.creator) {
+                alert("No puedes editar este documento. Abriendo en modo visor...");
+                window.location.href = `../Viewer/view.html?id=${docId}`;
+                return;
+            }
+
+            if (legacyDoc.content) populateEditorWithContent(legacyDoc.content);
+            return;
+        } catch (legacyErr) {
+            console.error("Legacy load error", legacyErr);
+            alert("Error cargando el documento. Abriendo en visor...");
             window.location.href = `../Viewer/view.html?id=${docId}`;
             return;
         }
     } catch (err) {
-        console.error(err);
-        alert("Error cargando el documento. Abriendo en visor...");
+        console.error("Unexpected load error", err);
+        alert("Ha ocurrido un error cargando el documento. Abriendo en visor...");
         window.location.href = `../Viewer/view.html?id=${docId}`;
     }
 });

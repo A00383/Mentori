@@ -1,8 +1,6 @@
-// editor.js
-// Full, corrected editor logic (documents -> organelles -> images + storage uploads)
-// Expects: `export const supabase = createClient(...)` from /supabase.js
-// and nanoid available from CDN as in your original setup.
-
+// editor.js — fixed, full file with login/logout rendering
+// -----------------------------
+// Top-level imports (must be at top)
 import { supabase } from '/supabase.js';
 import { nanoid } from 'https://cdn.jsdelivr.net/npm/nanoid/nanoid.js';
 
@@ -12,7 +10,7 @@ import { nanoid } from 'https://cdn.jsdelivr.net/npm/nanoid/nanoid.js';
 const popup = document.getElementById('pop-up');
 const closepopup = document.getElementById('close-pop-up');
 const savepopup = document.getElementById('save-pop-up');
-const organelos = document.querySelectorAll('.organelos') || [];
+const organelos = document.querySelectorAll('.organelos');
 const popupmessage = document.getElementById('pop-up-message');
 const popupimageinput = document.getElementById("pop-up-image-file");
 const popupimageadd = document.getElementById("pop-up-image-add");
@@ -32,9 +30,9 @@ const mainorganelname = document.getElementById('organelo');
 const copyBtn = document.getElementById('copybtn');
 const returnHomeBtn = document.getElementById("return-homebtn");
 const signInBtn = document.getElementById("sign-in");
-const userDiv = document.getElementById("user");
+const userDiv = document.getElementById("user"); // <-- for login/logout UI
 
-// organelle label elements (may be absent)
+// Organelles (may be null if not present)
 const membranacelular = document.getElementById('membrana celular');
 const citoplasma = document.getElementById('citoplasma');
 const nucleolo = document.getElementById('nucleolo');
@@ -50,17 +48,20 @@ const ribosomas = document.getElementById('ribosomas');
 // -----------------------------
 // State
 // -----------------------------
-let currentOrganel = null;
-let popupImageRemoveMode = false;
-let mainImageRemoveMode = false;
+let currentogranel = null;
+let popupimageremoveMode = false;
+let mainimageremoveMode = false;
+
 
 // -----------------------------
-// AUTH helpers
+// AUTH HELPERS (added)
 // -----------------------------
 async function login() {
     const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${location.origin}/MentoriCelulaAnimal/Editor/editor.html` }
+        options: {
+            redirectTo: `${location.origin}/MentoriCelulaAnimal/Editor/editor.html`
+        }
     });
     if (error) console.error("Login error:", error.message);
 }
@@ -74,7 +75,7 @@ function renderUser(user) {
     if (!userDiv) return;
     if (user) {
         userDiv.innerHTML = `
-      <span style="color:black; margin-right:10px;">${user.email ?? ""}</span>
+      <span style="color:black; margin-right: 10px;">${user.email ?? ""}</span>
       <button id="logout">Cerrar sesión</button>
     `;
         document.getElementById("logout")?.addEventListener("click", logout);
@@ -84,8 +85,9 @@ function renderUser(user) {
     }
 }
 
+
 (async () => {
-    const { data: { session } = {} } = await supabase.auth.getSession();
+    const { data: { session } } = await supabase.auth.getSession();
     renderUser(session?.user ?? null);
 })();
 
@@ -94,159 +96,176 @@ supabase.auth.onAuthStateChange((_event, session) => {
 });
 
 // -----------------------------
-// UI helpers: removable class / cursor
+// Helpers: cursor + removable helpers
 // -----------------------------
 function updateRemovableClass(selector, state) {
-    document.querySelectorAll(selector).forEach(el => el.classList.toggle('removable', state));
+    document.querySelectorAll(selector).forEach(img => {
+        img.classList.toggle('removable', state);
+    });
 }
-function addBodyEraser() { document.body.classList.add('eraser-cursor'); }
-function removeBodyEraser() { document.body.classList.remove('eraser-cursor'); }
+
+function addBodyEraser() {
+    document.body.classList.add('eraser-cursor');
+}
+function removeBodyEraser() {
+    document.body.classList.remove('eraser-cursor');
+}
+
 function exitAllRemoveModes() {
-    popupImageRemoveMode = false;
-    mainImageRemoveMode = false;
+    popupimageremoveMode = false;
+    mainimageremoveMode = false;
+
     updateRemovableClass('.pop-up-image', false);
     updateRemovableClass('.main-image', false);
+
     if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
     if (mainremoveBtn) mainremoveBtn.textContent = 'Quitar imagen';
+
     removeBodyEraser();
 }
 
-// clicking outside images cancels remove modes
+// If user clicks anywhere that's NOT an image, cancel remove modes.
 document.addEventListener('click', (e) => {
-    const t = e.target;
-    const clickedMain = t.classList && t.classList.contains('main-image');
-    const clickedPop = t.classList && t.classList.contains('pop-up-image');
-    if ((popupImageRemoveMode || mainImageRemoveMode) && !clickedMain && !clickedPop) exitAllRemoveModes();
+    const target = e.target;
+    const clickedMainImage = target.classList && target.classList.contains('main-image');
+    const clickedPopupImage = target.classList && target.classList.contains('pop-up-image');
+
+    // Any non-image click exits remove mode
+    if ((popupimageremoveMode || mainimageremoveMode) &&
+        !clickedMainImage && !clickedPopupImage) {
+        exitAllRemoveModes();
+    }
 });
 
+
 // -----------------------------
-// Attach handlers to image elements (idempotent)
+// Helper: attach handlers to images (main & popup)
 // -----------------------------
+// Attach only once per element (guard with property)
 function attachMainImageBehavior(img) {
     if (!img || img.__mainHandlersAttached) return;
     img.__mainHandlersAttached = true;
+
     img.addEventListener('click', (ev) => {
-        if (mainImageRemoveMode) {
+        if (mainimageremoveMode) {
             ev.stopPropagation();
-            img.remove();
+            if (img.parentElement) img.parentElement.removeChild(img);
         }
     });
 }
+
+
 function attachPopupImageBehavior(img) {
     if (!img || img.__popupHandlersAttached) return;
     img.__popupHandlersAttached = true;
+
     img.addEventListener('click', (ev) => {
-        if (popupImageRemoveMode) {
+        if (popupimageremoveMode) {
             ev.stopPropagation();
-            img.remove();
+            if (img.parentElement) img.parentElement.removeChild(img);
         }
     });
 }
+
+
+// Attach handlers to currently existing images (defensive)
 document.querySelectorAll('.main-image').forEach(attachMainImageBehavior);
 document.querySelectorAll('.pop-up-image').forEach(attachPopupImageBehavior);
 
 // -----------------------------
-// GATHER editor content
+// Helper: Gather editor content (fixed variable naming)
 // -----------------------------
 function gatherEditorContent() {
-    const saved = {
+    const savedataexport = {
         description: document.getElementById("description")?.value || "",
-        // mainImages: { src, file?, name }
-        mainImages: [...(mainimagesContainer?.querySelectorAll("img") || [])].map((img, i) => ({
-            src: img.src,
-            file: img.file || img.dataset.file || null,
-            name: img.dataset.name || `main-${i}-${Date.now()}.png`
-        })),
-        // organelos: { id, content, images: [ { src, file?, name } ] }
+        mainImages: [...(mainimagesContainer?.querySelectorAll("img") || [])].map(img => img.src),
         organelos: []
     };
 
-    Array.from(organelos).forEach((orgEl) => {
-        const id = orgEl?.id || null;
-        const content = orgEl?.dataset?.content || "";
+    Array.from(organelos).forEach((organelo) => {
+        // Use organelo variable consistently
+        const id = organelo?.id ?? (organelo ? organelo.id : null);
+        const content = organelo?.dataset?.content ?? (organelo.dataset?.content || "");
         let imagesArray = [];
         try {
-            if (orgEl.dataset?.image) imagesArray = JSON.parse(orgEl.dataset.image);
-        } catch (err) { imagesArray = []; }
+            if (organelo.dataset?.image) imagesArray = JSON.parse(organelo.dataset.image);
+            else if (organelo.dataset?.image === "") imagesArray = [];
+        } catch (err) {
+            imagesArray = [];
+        }
 
-        const images = (imagesArray || []).map((src, i) => ({
-            src,
-            file: null, // when user adds via popup we attach file on the image element; for dataset strings there is no file
-            name: `${id || 'org'}-img-${i}-${Date.now()}.png`
-        }));
-
-        saved.organelos.push({ id, content, images });
+        savedataexport.organelos.push({
+            id,
+            content,
+            image: imagesArray
+        });
     });
 
-    return saved;
+    return savedataexport;
 }
 
 // -----------------------------
-// POPULATE editor with content
+// Helper: Populate editor with content
 // -----------------------------
 function populateEditorWithContent(data) {
     if (!data) return;
-    const desc = document.getElementById("description");
-    if (desc) desc.value = data.description || "";
+    const descElem = document.getElementById("description");
+    if (descElem) descElem.value = data.description || "";
 
-    // mainImages can be strings or objects
     if (mainimagesContainer) {
         mainimagesContainer.innerHTML = "";
-        (data.mainImages || []).forEach((mi, i) => {
-            const src = typeof mi === 'string' ? mi : (mi.src || '');
-            const img = document.createElement('img');
+        (data.mainImages || []).forEach(src => {
+            const img = document.createElement("img");
             img.src = src;
-            img.classList.add('main-image');
+            img.classList.add("main-image");
             img.dataset.src = src;
-            if (typeof mi === 'object') {
-                if (mi.name) img.dataset.name = mi.name;
-                if (mi.file) img.file = mi.file;
-            }
+
             attachMainImageBehavior(img);
             mainimagesContainer.appendChild(img);
         });
     }
 
-    // organelos: map items to elements
-    (data.organelos || []).forEach((item, idx) => {
+    (data.organelos || []).forEach((item, index) => {
         let target = item.id ? document.getElementById(item.id) : null;
-        if (!target && organelos[idx]) target = organelos[idx];
-        if (!target) return;
-        target.dataset.content = item.content || "";
-        const imageSrcs = (item.images || item.image || []).map(x => (typeof x === 'string' ? x : x.src));
-        target.dataset.image = JSON.stringify(imageSrcs);
+        if (!target && organelos[index]) target = organelos[index];
+        if (target) {
+            target.dataset.content = item.content || "";
+            target.dataset.image = JSON.stringify(item.image || []);
+        }
     });
 }
 
 // -----------------------------
-// POPUP open / add images / save / close
+// Pop-up logic (open / add images / save / close)
 // -----------------------------
 if (organelos && organelos.length) {
-    organelos.forEach(el => {
-        el.addEventListener('click', () => {
-            if (mainImageRemoveMode) {
-                mainImageRemoveMode = false;
+    organelos.forEach(selectedorganel => {
+        selectedorganel.addEventListener('click', (e) => {
+            // Opening a popup should cancel main-image remove mode
+            if (mainimageremoveMode) {
+                mainimageremoveMode = false;
                 updateRemovableClass('.main-image', false);
                 if (mainremoveBtn) mainremoveBtn.textContent = 'Quitar imagen';
                 removeBodyEraser();
             }
 
-            currentOrganel = el;
-            if (popupmessage) popupmessage.value = el.dataset?.content || "";
+            currentogranel = selectedorganel;
+            if (popupmessage) popupmessage.value = selectedorganel.dataset?.content || "";
             if (popupimagecontainer) popupimagecontainer.innerHTML = "";
 
-            try {
-                const imgs = JSON.parse(el.dataset.image || "[]");
-                (imgs || []).forEach(src => {
-                    const popupimg = document.createElement("img");
-                    popupimg.src = src;
-                    popupimg.classList.add('pop-up-image');
-                    popupimg.dataset.image = src;
-                    attachPopupImageBehavior(popupimg);
-                    popupimagecontainer.appendChild(popupimg);
-                });
-            } catch (err) {
-                console.warn("Failed parsing organelle images:", err);
+            if (selectedorganel.dataset?.image && popupimagecontainer) {
+                try {
+                    const imgs = JSON.parse(selectedorganel.dataset.image || "[]");
+                    imgs.forEach(src => {
+                        const popupimg = document.createElement("img");
+                        popupimg.src = src;
+                        popupimg.classList.add("pop-up-image");
+                        attachPopupImageBehavior(popupimg);
+                        popupimagecontainer.appendChild(popupimg);
+                    });
+                } catch (err) {
+                    console.warn("Failed to parse organelle images:", err);
+                }
             }
 
             if (popup) popup.classList.add('active');
@@ -254,22 +273,24 @@ if (organelos && organelos.length) {
     });
 }
 
-// popup add -> file input
-if (popupimageadd && popupimageinput) popupimageadd.addEventListener('click', () => popupimageinput.click());
+// popup image add (if element exists)
+if (popupimageadd && popupimageinput) {
+    popupimageadd.addEventListener("click", () => popupimageinput.click());
+}
 
-// popup file input handler (attach File to element)
+// popup image input (file -> dataURL -> image element)
 if (popupimageinput && popupimagecontainer) {
     popupimageinput.addEventListener("change", (e) => {
         const popupfile = e.target.files[0];
         if (!popupfile) return;
+
         const reader = new FileReader();
         reader.onload = (event) => {
-            const popupimg = document.createElement('img');
+            const popupimg = document.createElement("img");
             popupimg.src = event.target.result;
-            popupimg.file = popupfile; // attach actual File
+            popupimg.classList.add("pop-up-image");
             popupimg.dataset.image = popupimg.src;
-            popupimg.dataset.name = popupfile.name || `popup-${Date.now()}.png`;
-            popupimg.classList.add('pop-up-image');
+
             attachPopupImageBehavior(popupimg);
             popupimagecontainer.appendChild(popupimg);
         };
@@ -278,43 +299,49 @@ if (popupimageinput && popupimagecontainer) {
     });
 }
 
-// save popup: write back to organelle dataset attributes
+
+// save popup (apply changes back to organelle)
 if (savepopup) {
     savepopup.addEventListener('click', () => {
-        if (!currentOrganel) return;
-        currentOrganel.dataset.content = popupmessage?.value || "";
+        if (!currentogranel) return;
+        currentogranel.dataset.content = popupmessage?.value || "";
         const imgs = [...(popupimagecontainer?.querySelectorAll("img") || [])].map(img => img.src);
-        currentOrganel.dataset.image = JSON.stringify(imgs);
+        currentogranel.dataset.image = JSON.stringify(imgs);
+        // close popup and reset popup remove mode
         popup?.classList.remove('active');
-        popupImageRemoveMode = false;
+        popupimageremoveMode = false;
         updateRemovableClass('.pop-up-image', false);
         if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
         removeBodyEraser();
     });
 }
 
-// close popup
+// close popup (cancel)
 if (closepopup) {
-    closepopup.addEventListener('click', () => {
+    closepopup.addEventListener("click", () => {
         popup?.classList.remove('active');
-        popupImageRemoveMode = false;
+        // reset popup remove mode on close
+        popupimageremoveMode = false;
         updateRemovableClass('.pop-up-image', false);
         if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
         removeBodyEraser();
     });
 }
 
-// backdrop click saves popup changes and closes
+// clicking backdrop closes popup and resets modes
 if (popup) {
     popup.addEventListener('click', (e) => {
         if (e.target === popup) {
-            if (currentOrganel) {
-                currentOrganel.dataset.content = popupmessage?.value || "";
+            // save content back to current organelle (keeps consistent with previous behavior)
+            if (currentogranel) {
+                currentogranel.dataset.content = popupmessage?.value || "";
                 const imgs = [...(popupimagecontainer?.querySelectorAll("img") || [])].map(img => img.src);
-                currentOrganel.dataset.image = JSON.stringify(imgs);
+                currentogranel.dataset.image = JSON.stringify(imgs);
             }
             popup.classList.remove('active');
-            popupImageRemoveMode = false;
+
+            // reset popup remove mode
+            popupimageremoveMode = false;
             updateRemovableClass('.pop-up-image', false);
             if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
             removeBodyEraser();
@@ -323,23 +350,27 @@ if (popup) {
 }
 
 // -----------------------------
-// Main images add/remove
+// Main images logic (add / remove toggle)
 // -----------------------------
-if (mainaddBtn && mainimageinput) mainaddBtn.addEventListener('click', () => mainimageinput.click());
+if (mainaddBtn && mainimageinput) {
+    mainaddBtn.addEventListener("click", () => mainimageinput.click());
+}
 
 if (mainimageinput && mainimagesContainer) {
-    mainimageinput.addEventListener('change', (e) => {
+    mainimageinput.addEventListener("change", (e) => {
         const file = e.target.files[0];
         if (!file) return;
+
         const reader = new FileReader();
         reader.onload = (event) => {
-            const img = document.createElement('img');
+            const img = document.createElement("img");
             img.src = event.target.result;
-            img.classList.add('main-image');
+            img.classList.add("main-image");
             img.dataset.src = img.src;
-            img.dataset.name = file.name || `main-${Date.now()}.png`;
-            img.file = file;
+
+            // Attach removal + hover handlers (safe: these handlers check the mode at runtime)
             attachMainImageBehavior(img);
+
             mainimagesContainer.appendChild(img);
         };
         reader.readAsDataURL(file);
@@ -347,33 +378,63 @@ if (mainimageinput && mainimagesContainer) {
     });
 }
 
-// REMOVE toggles for main/popup images
+// -----------------------------
+// MAIN IMAGE REMOVE TOGGLE
+// -----------------------------
 if (mainremoveBtn) {
-    mainremoveBtn.addEventListener('click', (ev) => {
+    mainremoveBtn.addEventListener("click", (ev) => {
         ev.stopPropagation();
-        if (popupImageRemoveMode) {
-            popupImageRemoveMode = false;
+
+        // cancel popup mode if active
+        if (popupimageremoveMode) {
+            popupimageremoveMode = false;
             updateRemovableClass('.pop-up-image', false);
             if (popupimageremove) popupimageremove.textContent = 'Quitar imagen';
         }
-        mainImageRemoveMode = !mainImageRemoveMode;
-        updateRemovableClass('.main-image', mainImageRemoveMode);
-        mainremoveBtn.textContent = mainImageRemoveMode ? "Cancelar quitar" : "Quitar imagen";
-        if (mainImageRemoveMode) addBodyEraser(); else removeBodyEraser();
+
+        mainimageremoveMode = !mainimageremoveMode;
+
+        // toggle removable class
+        updateRemovableClass('.main-image', mainimageremoveMode);
+
+        // button text
+        mainremoveBtn.textContent = mainimageremoveMode ? "Cancelar quitar" : "Quitar imagen";
+
+        // eraser cursor on body
+        if (mainimageremoveMode) addBodyEraser();
+        else removeBodyEraser();
+
+        console.log('mainimageremoveMode:', mainimageremoveMode);
     });
 }
+
+// -----------------------------
+// POPUP IMAGE REMOVE TOGGLE
+// -----------------------------
 if (popupimageremove) {
-    popupimageremove.addEventListener('click', (ev) => {
+    popupimageremove.addEventListener("click", (ev) => {
         ev.stopPropagation();
-        if (mainImageRemoveMode) {
-            mainImageRemoveMode = false;
+
+        // cancel main mode if active
+        if (mainimageremoveMode) {
+            mainimageremoveMode = false;
             updateRemovableClass('.main-image', false);
             if (mainremoveBtn) mainremoveBtn.textContent = 'Quitar imagen';
         }
-        popupImageRemoveMode = !popupImageRemoveMode;
-        updateRemovableClass('.pop-up-image', popupImageRemoveMode);
-        popupimageremove.textContent = popupImageRemoveMode ? "Cancelar quitar" : "Quitar imagen";
-        if (popupImageRemoveMode) addBodyEraser(); else removeBodyEraser();
+
+        popupimageremoveMode = !popupimageremoveMode;
+
+        // toggle removable class
+        updateRemovableClass('.pop-up-image', popupimageremoveMode);
+
+        // button text
+        popupimageremove.textContent = popupimageremoveMode ? "Cancelar quitar" : "Quitar imagen";
+
+        // eraser cursor on body
+        if (popupimageremoveMode) addBodyEraser();
+        else removeBodyEraser();
+
+        console.log('popupimageremoveMode:', popupimageremoveMode);
     });
 }
 
@@ -381,261 +442,127 @@ if (popupimageremove) {
 // Local save (.txt)
 // -----------------------------
 if (savebtn) {
-    savebtn.addEventListener('click', () => {
+    savebtn.addEventListener("click", () => {
         const content = gatherEditorContent();
-        const blob = new Blob([JSON.stringify(content, null, 2)], { type: "application/json" });
+        const blob = new Blob([JSON.stringify(content, null, 2)], { type: "text/plain" });
         const url = URL.createObjectURL(blob);
+
         const a = document.createElement("a");
         a.href = url;
-        a.download = "dataset.json";
+        a.download = "datasets.txt";
         document.body.appendChild(a);
         a.click();
-        a.remove();
+        document.body.removeChild(a);
         URL.revokeObjectURL(url);
     });
 }
 
 // -----------------------------
-// Upload helper (supports File or dataURL string)
-// -----------------------------
-async function uploadImage(fileOrDataUrl, filename) {
-    const user = await getCurrentUser();
-    if (!user) throw new Error("Must be logged in to upload images");
-
-    // convert dataURL to Blob if necessary
-    let fileToUpload = fileOrDataUrl;
-    if (typeof fileOrDataUrl === 'string' && fileOrDataUrl.startsWith('data:')) {
-        const res = await fetch(fileOrDataUrl);
-        fileToUpload = await res.blob();
-    }
-
-    // Ensure filename is safe
-    const safeName = filename.replace(/[^\w.\-]/g, '_');
-    const filePath = `${user.id}/${Date.now()}-${safeName}`;
-
-    const { error: uploadErr } = await supabase.storage.from("images").upload(filePath, fileToUpload, { cacheControl: '3600', upsert: false });
-    if (uploadErr) {
-        throw uploadErr;
-    }
-
-    const { data } = supabase.storage.from("images").getPublicUrl(filePath);
-    return data.publicUrl;
-}
-
-// -----------------------------
-// Auth helper
+// Supabase Online Save & Load helpers
 // -----------------------------
 async function getCurrentUser() {
     const { data } = await supabase.auth.getSession();
     return data?.session?.user ?? null;
 }
 
-// -----------------------------
-// CREATE document + organelles + images
-// -----------------------------
-async function createDocumentAndAssets(editorContent, docId = null) {
+async function createDocument(editorContent) {
     const user = await getCurrentUser();
-    console.log("👤 Current user:", user);
+    if (!user) throw new Error('Must be logged-in to save document');
 
-    if (!user) {
-        alert("❌ Please login first");
-        return null;
-    }
-
+    const id = nanoid();
     const now = new Date().toISOString();
-    const id = docId || window.nanoid();
+    const { error } = await supabase.from('documents').insert({
+        id,
+        creator: user.email,
+        created_at: now,
+        updated_at: now,
+        content: editorContent
+    });
 
-    console.log("📝 Saving document with ID:", id, "for user:", user.id);
-
-    const { error: docErr } = await supabase.from("documents").upsert(
-        {
-            id,
-            title: "Célula animal",
-            description: editorContent.description,
-            content: editorContent, // ✅ use the argument, not a missing variable
-            creator: user.email,
-            owner_id: user.id,
-            created_at: now,
-            updated_at: now,
-        },
-        { onConflict: "id" }
-    );
-
-    if (docErr) {
-        console.error("❌ Document save failed:", docErr);
-        alert("Failed to save document: " + docErr.message);
-        return null;
-    }
-
-    console.log("✅ Document saved!");
+    if (error) throw error;
     return id;
 }
 
-
-
-// -----------------------------
-// UPDATE document + assets (clear & reinsert)
-// -----------------------------
-async function updateDocumentAndAssets(documentId, editorContent) {
+async function updateDocument(id, editorContent) {
     const now = new Date().toISOString();
+    const { error } = await supabase.from('documents')
+        .update({ content: editorContent, updated_at: now })
+        .eq('id', id);
 
-    // update document's content and updated_at
-    const { error: docErr } = await supabase.from('documents').update({
-        updated_at: now,
-        content: editorContent
-    }).eq('id', documentId);
-    if (docErr) throw docErr;
-
-    // fetch organelle ids for this document
-    const { data: existingOrganelles } = await supabase.from('organelles').select('id').eq('document_id', documentId);
-    const organelleIds = (existingOrganelles || []).map(r => r.id);
-
-    // delete images tied to document (document-level)
-    await supabase.from('images').delete().eq('document_id', documentId);
-
-    // delete images tied to those organelles (if any)
-    if (organelleIds.length) {
-        await supabase.from('images').delete().in('organelle_id', organelleIds);
-    }
-
-    // delete organelles
-    await supabase.from('organelles').delete().eq('document_id', documentId);
-
-    // reinsert organelles & images
-    for (const organelle of (editorContent.organelos || [])) {
-        const { data: organelleRow, error: orgErr } = await supabase.from('organelles')
-            .insert({
-                document_id: documentId,
-                name: organelle.id || `org-${Date.now()}`,
-                content: organelle.content || ""
-            })
-            .select()
-            .single();
-        if (orgErr) throw orgErr;
-
-        for (const img of (organelle.images || organelle.image || [])) {
-            let finalUrl = img.src;
-            if (img.file) {
-                finalUrl = await uploadImage(img.file, img.name || `${organelleRow.id}-${Date.now()}.png`);
-            }
-            const { error: imgErr } = await supabase.from('images').insert({
-                organelle_id: organelleRow.id,
-                url: finalUrl
-            });
-            if (imgErr) throw imgErr;
-        }
-    }
-
-    // reinsert main images
-    for (const mi of (editorContent.mainImages || [])) {
-        let finalUrl = mi.src;
-        if (mi.file) {
-            finalUrl = await uploadImage(mi.file, mi.name || `main-${Date.now()}.png`);
-        }
-        const { error: imgErr } = await supabase.from('images').insert({
-            document_id: documentId,
-            url: finalUrl
-        });
-        if (imgErr) throw imgErr;
-    }
-
+    if (error) throw error;
     return true;
 }
 
-// -----------------------------
-// LOAD document and build editor-format content
-// -----------------------------
 async function loadDocumentById(id) {
-    const { data: doc, error: docErr } = await supabase.from('documents').select('*').eq('id', id).maybeSingle();
-    if (docErr) throw docErr;
-    if (!doc) throw new Error("Document not found");
+    const { data, error } = await supabase.from('documents')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
 
-    const { data: organellesRows, error: orgErr } = await supabase.from('organelles').select('*').eq('document_id', id);
-    if (orgErr) throw orgErr;
-
-    const { data: docImages, error: diErr } = await supabase.from('images').select('*').eq('document_id', id);
-    if (diErr) throw diErr;
-
-    // organelle images lookup
-    const organelleImages = {};
-    for (const o of (organellesRows || [])) {
-        const { data: imgs, error: imgErr } = await supabase.from('images').select('*').eq('organelle_id', o.id);
-        if (imgErr) throw imgErr;
-        organelleImages[o.name] = imgs || [];
-    }
-
-    return {
-        ...doc,
-        content: {
-            description: doc.description,
-            mainImages: (docImages || []).map(i => i.url),
-            organelos: (organellesRows || []).map(o => ({
-                id: o.name,
-                content: o.content,
-                image: (organelleImages[o.name] || []).map(i => i.url)
-            }))
-        }
-    };
+    if (error) throw error;
+    return data;
 }
 
-// =======================
-// EVENT HANDLERS
-// =======================
-
-// --- SAVE ONLINE ---
-if (saveonlinebutton) {
-    saveonlinebutton.addEventListener("click", async () => {
-        console.log("💾 Save Online button clicked");
-
-        const content = gatherEditorContent();
-        console.log("📦 Gathered editor content:", content);
-
-        try {
-            const docId = new URLSearchParams(window.location.search).get("id");
-            const savedId = await createDocumentAndAssets(content, docId);
-
-            if (savedId) {
-                alert("✅ Document saved online!");
-                console.log("🔗 Saved document ID:", savedId);
-            }
-        } catch (err) {
-            console.error("❌ Save failed:", err);
-            alert("Save failed, check console");
-        }
-    });
-} else {
-    console.error("❌ Save Online button NOT found in DOM");
-}
-
-// --- COPY LINK ---
+// ------------------------------
+// Copy Button
+// ------------------------------
 if (copyBtn) {
-    copyBtn.addEventListener("click", async () => {
-        console.log("📋 Copy button clicked");
+    copyBtn.addEventListener('click', async () => {
+        const content = gatherEditorContent(); // get current editor content
+        const user = await getCurrentUser();
 
-        const docId = new URLSearchParams(window.location.search).get("id");
-        if (!docId) {
-            alert("❌ No document ID found in URL");
+        if (!user) {
+            alert('Debes haber iniciado sesión para copiar un documento');
             return;
         }
 
-        const shareUrl = `${window.location.origin}/editor.html?id=${docId}`;
-        console.log("🔗 Share URL generated:", shareUrl);
-
         try {
-            await navigator.clipboard.writeText(shareUrl);
-            alert("✅ Link copied to clipboard!");
+            // Create new document with same content
+            const newId = await createDocument(content);
+
+            // Open new editor window with new document
+            window.open(`/MentoriCelulaAnimal/Editor/editor.html?id=${newId}`, '_blank');
         } catch (err) {
-            console.error("❌ Clipboard write failed:", err);
-            alert("Failed to copy link. Try manually: " + shareUrl);
+            console.error(err);
+            alert('Error al copiar el documento: ' + err.message);
         }
     });
-} else {
-    console.error("❌ Copy button NOT found in DOM");
 }
 
+// -----------------------------
+// Save online (create or update)
+// -----------------------------
+if (saveonlinebutton) {
+    saveonlinebutton.addEventListener("click", async () => {
+        const content = gatherEditorContent();
+        const docId = new URLSearchParams(window.location.search).get("id");
+
+        try {
+            const user = await getCurrentUser();
+            if (!user) return alert("Debes estar en una cuenta para poder guardar en linea.");
+
+            if (docId) {
+                const doc = await loadDocumentById(docId);
+                if (!doc) return alert("No se encontro el documento.");
+                if (doc.creator !== user.email) return alert("Tú no eres el creador de este documento.");
+
+                await updateDocument(docId, content);
+                alert("Documento guardado exitosamente!");
+            } else {
+                const newId = await createDocument(content);
+                alert("Documento guardado exitosamente!");
+                // Redirect using absolute path from root
+                window.location.href = `../Editor/editor.html?id=${newId}`;
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Error al guardar el documento: " + err.message);
+        }
+    });
+}
 
 // -----------------------------
-// Local load from .txt/.json
+// Load local .txt dataset
 // -----------------------------
 if (loadBtn && loadInput) {
     loadBtn.addEventListener("click", () => loadInput.click());
@@ -643,14 +570,13 @@ if (loadBtn && loadInput) {
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = (ev) => {
+        reader.onload = (event) => {
             try {
-                const data = JSON.parse(ev.target.result);
+                const data = JSON.parse(event.target.result);
                 populateEditorWithContent(data);
-                alert("Contenido cargado correctamente!");
-            } catch (err) {
-                console.error("Local load parse error:", err);
-                alert("El archivo no es un JSON válido.");
+                alert("Centenido cargado correctamente!");
+            } catch {
+                alert("Error: El archivo no es un JSON valido.");
             }
         };
         reader.readAsText(file);
@@ -659,54 +585,70 @@ if (loadBtn && loadInput) {
 }
 
 // -----------------------------
-// Auto-load on DOMContentLoaded + authorization checks
+// Auto-load dataset & enforce creator-only access
 // -----------------------------
 async function refreshSignInUI() {
     const user = await getCurrentUser();
-    if (signInBtn) signInBtn.style.display = user ? 'none' : 'inline-block';
+    if (signInBtn) {
+        signInBtn.style.display = user ? 'none' : 'inline-block';
+    }
 }
-supabase.auth.onAuthStateChange((_e, _s) => refreshSignInUI().catch(console.error));
+
+// Listen to auth state changes so UI updates instantly on sign in/out
+supabase.auth.onAuthStateChange((_event, _session) => {
+    refreshSignInUI().catch(err => console.error('refreshSignInUI error', err));
+});
 
 window.addEventListener('DOMContentLoaded', async () => {
+    // Update sign-in button visibility at startup
     await refreshSignInUI();
-    const docId = new URLSearchParams(window.location.search).get('id');
+
+    const docId = new URLSearchParams(window.location.search).get("id");
     if (!docId) return;
+
     try {
         const doc = await loadDocumentById(docId);
-        if (!doc) { alert("Documento no encontrado."); window.location.href = "../Viewer/view.html"; return; }
+        if (!doc) {
+            alert("Documento no encontrado.");
+            window.location.href = "../Viewer/view.html";
+            return;
+        }
+
         const user = await getCurrentUser();
+
         if (!user || user.email !== doc.creator) {
-            alert("No tienes autorización para editar este documento. Redirigiendo a la vista...");
+            alert("No tienes la autorización para editar este documento, enviandote a la versión de vista...");
             window.location.href = `../Viewer/view.html?id=${docId}`;
             return;
         }
+
+        // Populate editor with content
         if (doc.content) populateEditorWithContent(doc.content);
+
     } catch (err) {
-        console.error("Load doc error:", err);
-        alert("Error cargando documento — redirigiendo a vista...");
+        console.error("Failed to load document:", err);
+        alert("Ha ocurrido un error cargando el documento, redirigiendote a la versión de vista...");
         window.location.href = `../Viewer/view.html?id=${docId}`;
     }
 });
 
-// -----------------------------
-// Return home, switch to viewer, organelle hover names
-// -----------------------------
-if (returnHomeBtn) returnHomeBtn.addEventListener('click', () => window.location.href = "/index.html");
-
-if (switchviewbtn) {
-    switchviewbtn.addEventListener('click', () => {
-        const docId = new URLSearchParams(window.location.search).get('id');
-        if (!docId) { alert("Guarda el documento antes de entrar en modo visor."); return; }
-        const viewerUrl = `https://mentorigroup.com/MentoriCelulaAnimal/Viewer/view.html?id=${docId}`;
-        window.open(viewerUrl, "_blank");
+//---------------------
+// Return home button
+//---------------------
+if (returnHomeBtn) {
+    returnHomeBtn.addEventListener("click", () => {
+        window.location.href = "/index.html";
     });
 }
 
-function setupOrganelName(orgEl, displayName) {
-    if (!orgEl) return;
-    orgEl.addEventListener('click', () => { if (popupname) popupname.textContent = displayName; });
-    orgEl.addEventListener('mouseenter', () => { if (mainorganelname) mainorganelname.textContent = displayName; });
-    orgEl.addEventListener('mouseleave', () => { if (mainorganelname) mainorganelname.textContent = "Célula animal"; });
+// -----------------------------
+// Organelles hover + click names
+// -----------------------------
+function setupOrganelName(organel, displayName) {
+    if (!organel) return;
+    organel.addEventListener('click', () => { if (popupname) popupname.textContent = displayName; });
+    organel.addEventListener('mouseenter', () => { if (mainorganelname) mainorganelname.textContent = displayName; });
+    organel.addEventListener('mouseleave', () => { if (mainorganelname) mainorganelname.textContent = "Célula animal"; });
 }
 
 setupOrganelName(membranacelular, "Membrana celular");
@@ -721,4 +663,29 @@ setupOrganelName(mitocondrias, "Mitocondrias");
 setupOrganelName(lisosomas, "Lisosomas");
 setupOrganelName(aparatodegolgi, "Aparato de Golgi");
 
-// End of editor.js
+//serviceworker//
+
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (let registration of registrations) {
+            registration.unregister();
+            console.log("Unregistered service worker:", registration);
+        }
+    });
+}
+
+// ------------------------------
+// Switch to Viewer Mode
+// ------------------------------
+if (switchviewbtn) {
+    switchviewbtn.addEventListener("click", () => {
+        const docId = new URLSearchParams(window.location.search).get("id");
+        if (!docId) {
+            alert("No se encontró un ID de documento. Guarda el documento antes de cambiar a modo visor.");
+            return;
+        }
+        const viewerUrl = `https://mentorigroup.com/MentoriCelulaAnimal/Viewer/view.html?id=${docId}`;
+        window.open(viewerUrl, "_blank"); // opens in new tab
+        // Or use window.location.href = viewerUrl; if you want to replace instead of opening
+    });
+}

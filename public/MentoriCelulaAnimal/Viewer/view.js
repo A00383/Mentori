@@ -36,6 +36,7 @@ const userDiv = document.getElementById("user");
 
 // Organelles
 const membranacelular = document.getElementById('membrana celular');
+const ribosomas = document.getElementById('ribosomas');
 const citoplasma = document.getElementById('citoplasma');
 const nucleolo = document.getElementById('nucleolo');
 const nucleo = document.getElementById('nucleo');
@@ -359,6 +360,7 @@ function setupOrganelName(organel, displayName) {
 
 setupOrganelName(membranacelular, "Membrana celular");
 setupOrganelName(citoplasma, "Citoplasma");
+setupOrganelName(ribosomas, "Ribosomas");
 setupOrganelName(nucleolo, "Nucléolo");
 setupOrganelName(nucleo, "Núcleo");
 setupOrganelName(reticuloendoplasmatico, "Retículo endoplasmático");

@@ -469,26 +469,25 @@ async function getCurrentUser() {
 
 async function createDocumentOnline() {
     const user = await getCurrentUser();
-    if (!user) throw new Error('Must be logged-in to save document');
+    if (!user) throw new Error("Usuario no autenticado");
 
     const id = nanoid();
     const now = new Date().toISOString();
 
-    const title = document.getElementById("document-title")?.innerText || "Untitled";
-    const description = document.getElementById("description")?.value || "";
-
     const { error } = await supabase.from("documents").insert({
         id,
-        title,
-        description,
-        creator: user.email,
-        owner_id: user.id,
+        title: "Untitled",
+        description: "",
+        creator: user.email,   // ✅ email for easy querying
+        owner_id: user.id,     // ✅ uuid for secure ownership
         created_at: now,
         updated_at: now
     });
+
     if (error) throw error;
     return id;
 }
+
 
 async function saveOrganellesAndImages(documentId) {
     const organelleSections = document.querySelectorAll(".organelos");

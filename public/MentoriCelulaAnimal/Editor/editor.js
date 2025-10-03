@@ -189,24 +189,38 @@ function gatherEditorContent() {
     return savedataexport;
 }
 
+function gatherEditorContent() {
+    const savedataexport = {
+        description: document.getElementById("description")?.value || "",
+        mainImages: [...(mainimagesContainer?.querySelectorAll("img") || [])].map((img, i) => ({
+            src: img.src,  // may still be base64 if not uploaded yet
+            file: img.file || img.dataset.file || null, // File object if available
+            name: `main-${i}-${Date.now()}.png` // unique filename
+        })),
+        organelos: []
+    };
+
+    const organelos = document.querySelectorAll(".organelos") || [];
     Array.from(organelos).forEach((organelo) => {
-        // Use organelo variable consistently
-        const id = organelo?.id ?? (organelo ? organelo.id : null);
-        const content = organelo?.dataset?.content ?? (organelo.dataset?.content || "");
+        const id = organelo?.id || null;
+        const content = organelo?.dataset?.content || "";
+
         let imagesArray = [];
         try {
-            if (organelo.dataset?.image) imagesArray = JSON.parse(organelo.dataset.image);
-            else if (organelo.dataset?.image === "") imagesArray = [];
+            if (organelo.dataset?.image) {
+                imagesArray = JSON.parse(organelo.dataset.image);
+            }
         } catch (err) {
+            console.warn(`Failed to parse images for organelo ${id}:`, err);
             imagesArray = [];
         }
 
         savedataexport.organelos.push({
             id,
             content,
-            image: imagesArray.map((src, i) => ({
-                file: null,  // later we’ll assign if uploaded
+            images: imagesArray.map((src, i) => ({
                 src,
+                file: null,  // will be replaced when real file is uploaded
                 name: `${id}-img-${i}-${Date.now()}.png`
             }))
         });
@@ -214,6 +228,7 @@ function gatherEditorContent() {
 
     return savedataexport;
 }
+
 
 // -----------------------------
 // Helper: Populate editor with content

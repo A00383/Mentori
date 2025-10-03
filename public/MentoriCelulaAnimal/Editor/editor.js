@@ -179,12 +179,15 @@ function gatherEditorContent() {
     const savedataexport = {
         description: document.getElementById("description")?.value || "",
         mainImages: [...(mainimagesContainer?.querySelectorAll("img") || [])].map((img, i) => ({
-            file: img.dataset.file || null,   // <-- file object stored in dataset
-            src: img.src,                     // preview
+            src: img.src,  // may still be base64 if not uploaded yet
+            file: img.file || img.dataset.file || null, // prefer real file, fallback to dataset
             name: `main-${i}-${Date.now()}.png` // unique filename
         })),
         organelos: []
     };
+
+    return savedataexport;
+}
 
     Array.from(organelos).forEach((organelo) => {
         // Use organelo variable consistently
@@ -295,7 +298,8 @@ if (popupimageinput && popupimagecontainer) {
         const reader = new FileReader();
         reader.onload = (event) => {
             const popupimg = document.createElement("img");
-            popupimg.src = event.target.result;
+            img.src = event.target.result;
+            img.file = file; // <-- attach actual file so it can be uploaded later
             popupimg.classList.add("pop-up-image");
             popupimg.dataset.image = popupimg.src;
 
@@ -466,6 +470,26 @@ if (savebtn) {
 }
 
 // -----------------------------
+// IMAGE UPLOAD HELPER
+// -----------------------------
+async function uploadImage(file, name) {
+    const user = await getCurrentUser();
+    if (!user) throw new Error("Must be logged in to upload images");
+
+    const filePath = `${user.id}/${Date.now()}-${name}`;
+    const { error: uploadErr } = await supabase.storage
+        .from("images") // make sure you created a bucket named "images"
+        .upload(filePath, file);
+
+    if (uploadErr) throw uploadErr;
+
+    // Get public URL
+    const { data } = supabase.storage.from("images").getPublicUrl(filePath);
+    return data.publicUrl;
+}
+
+
+// -----------------------------
 // Supabase Online Save & Load helpers
 // -----------------------------
 async function getCurrentUser() {
@@ -506,20 +530,28 @@ async function createDocument(editorContent) {
         if (orgErr) throw orgErr;
 
         // Insert images linked to organelle
-        for (const url of organelle.image || []) {
+        for (const img of organelle.image || []) {
+            let finalUrl = img.src;
+            if (img.file) {
+                finalUrl = await uploadImage(img.file, img.name);
+            }
             const { error: imgErr } = await supabase.from('images').insert({
                 organelle_id: organelleRow.id,
-                url
+                url: finalUrl
             });
             if (imgErr) throw imgErr;
         }
     }
 
     // Insert main images (linked only to document)
-    for (const url of (editorContent.mainImages || [])) {
+    for (const img of (editorContent.mainImages || [])) {
+        let finalUrl = img.src;
+        if (img.file) {
+            finalUrl = await uploadImage(img.file, img.name);
+        }
         const { error: imgErr } = await supabase.from('images').insert({
             document_id: id,
-            url
+            url: finalUrl
         });
         if (imgErr) throw imgErr;
     }

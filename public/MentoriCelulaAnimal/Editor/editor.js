@@ -491,15 +491,13 @@ async function createDocumentOnline() {
 }
 
 async function saveOrganellesAndImages(documentId) {
-    // ✅ match your HTML structure
     const organelleSections = document.querySelectorAll(".organelos");
 
     for (let section of organelleSections) {
-        // ✅ use dataset.organelle OR fallback to id
         const name = section.dataset.organelle || section.id;
         const content = section.dataset.content || "";
 
-        // upsert organelle
+        // Upsert organelle
         const { data: organelle, error: orgErr } = await supabase.from("organelles")
             .upsert({
                 document_id: documentId,
@@ -509,77 +507,89 @@ async function saveOrganellesAndImages(documentId) {
             }, { onConflict: "document_id,name" })
             .select()
             .single();
-        if (orgErr) throw orgErr;
 
-        // upsert images
-        const imgs = JSON.parse(section.dataset.image || "[]");
-        for (let src of imgs) {
+        if (orgErr) {
+            console.error("Error saving organelle:", orgErr);
+            continue;
+        }
+
+        // ✅ Save images
+        const imgs = section.querySelectorAll("img");
+        for (let img of imgs) {
+            let imageUrl = img.src;
+
+            // If it's a base64 Data URL → upload to Supabase Storage
+            if (imageUrl.startsWith("data:")) {
+                try {
+                    const filePath = `${documentId}/${organelle.id}/${Date.now()}.png`;
+
+                    // Convert base64 to Blob
+                    const response = await fetch(imageUrl);
+                    const blob = await response.blob();
+
+                    const { error: uploadError } = await supabase.storage
+                        .from("images") // your storage bucket name
+                        .upload(filePath, blob, { upsert: true });
+
+                    if (uploadError) throw uploadError;
+
+                    // Get public URL
+                    const { data: publicUrlData } = supabase.storage
+                        .from("images")
+                        .getPublicUrl(filePath);
+
+                    imageUrl = publicUrlData.publicUrl;
+                } catch (e) {
+                    console.error("Image upload failed:", e);
+                    continue;
+                }
+            }
+
+            // Save only the URL in DB
             const { error: imgErr } = await supabase.from("images").upsert({
                 document_id: documentId,
                 organelle_id: organelle.id,
-                url: src
+                url: imageUrl
             }, { onConflict: "organelle_id,url" });
-            if (imgErr) throw imgErr;
+
+            if (imgErr) console.error("Error saving image:", imgErr);
         }
     }
 
-    // Save main images (outside organelles)
-    const mainImgs = [...(mainimagesContainer?.querySelectorAll("img") || [])].map(img => img.src);
-    for (let src of mainImgs) {
+    // ✅ Handle "main images" (outside organelles)
+    const mainImgs = [...(mainimagesContainer?.querySelectorAll("img") || [])];
+    for (let img of mainImgs) {
+        let imageUrl = img.src;
+
+        if (imageUrl.startsWith("data:")) {
+            try {
+                const filePath = `${documentId}/main/${Date.now()}.png`;
+
+                const response = await fetch(imageUrl);
+                const blob = await response.blob();
+
+                const { error: uploadError } = await supabase.storage
+                    .from("images")
+                    .upload(filePath, blob, { upsert: true });
+
+                if (uploadError) throw uploadError;
+
+                const { data: publicUrlData } = supabase.storage
+                    .from("images")
+                    .getPublicUrl(filePath);
+
+                imageUrl = publicUrlData.publicUrl;
+            } catch (e) {
+                console.error("Main image upload failed:", e);
+                continue;
+            }
+        }
+
         await supabase.from("images").upsert({
             document_id: documentId,
-            url: src
+            url: imageUrl
         }, { onConflict: "document_id,url" });
     }
-}
-
-
-async function updateDocumentOnline(docId) {
-    const now = new Date().toISOString();
-    const title = document.getElementById("document-title")?.innerText || "Untitled";
-    const description = document.getElementById("description")?.value || "";
-
-    const { error } = await supabase.from("documents")
-        .update({ title, description, updated_at: now })
-        .eq("id", docId);
-    if (error) throw error;
-
-    await saveOrganellesAndImages(docId);
-}
-
-function sleep(ms) {
-    return new Promise(res => setTimeout(res, ms));
-}
-
-async function loadDocumentByIdOnline(id) {
-    try {
-        const { data: doc, error: docErr } = await supabase
-            .from("documents")
-            .select("*")
-            .eq("id", id)
-            .maybeSingle();
-        if (docErr) throw docErr;
-
-        const { data: organelles, error: orgErr } = await supabase
-            .from("organelles")  // ✅ matches table name
-            .select("*, images(*)")
-            .eq("document_id", id);
-        if (orgErr) throw orgErr;
-
-        return { doc: doc ?? null, organelles: organelles ?? [] };
-    } catch (err) {
-        console.warn("loadDocumentByIdOnline failed:", err);
-        return { doc: null, organelles: [] };
-    }
-}
-
-async function tryLoadNormalizedWithRetry(id, attempts = 6, delayMs = 400) {
-    for (let i = 0; i < attempts; i++) {
-        const result = await loadDocumentByIdOnline(id);
-        if (result.doc) return result;
-        await sleep(delayMs);
-    }
-    return await loadDocumentByIdOnline(id);
 }
 
 

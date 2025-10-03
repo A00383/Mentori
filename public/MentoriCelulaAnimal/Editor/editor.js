@@ -434,6 +434,8 @@ async function getCurrentUser() {
 // CREATE document + organelles + images
 // -----------------------------
 async function createDocumentAndAssets(editorContent, docId = null) {
+    const savedId = await createDocumentAndAssets(content, docId);
+    console.log("⚡ After createDocumentAndAssets, got:", savedId);
     const user = await getCurrentUser();
     console.log("👤 Current user:", user);
     if (!user) {

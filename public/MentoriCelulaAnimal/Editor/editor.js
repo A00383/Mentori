@@ -495,7 +495,7 @@ async function saveOrganellesAndImages(documentId) {
         const content = section.dataset.content || "";
 
         // upsert organelle
-        const { data: organelle, error: orgErr } = await supabase.from("organeles")
+        const { data: organelle, error: orgErr } = await supabase.from("organelles")
             .upsert({
                 document_id: documentId,
                 name,
@@ -555,7 +555,7 @@ async function loadDocumentByIdOnline(id) {
         if (docErr) throw docErr;
 
         const { data: organelles, error: orgErr } = await supabase
-            .from("organeles")
+            .from("organelles")  // ✅ matches table name
             .select("*, images(*)")
             .eq("document_id", id);
         if (orgErr) throw orgErr;

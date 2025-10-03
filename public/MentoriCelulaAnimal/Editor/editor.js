@@ -472,56 +472,42 @@ if (savebtn) {
     });
 }
 
-// -----------------------------
-// Supabase Online Save & Load (normalized schema)
-// -----------------------------
-async function createDocumentOnline() {
-    const user = await getCurrentUser();
-    if (!user) throw new Error("Usuario no autenticado");
-
-    const id = nanoid();
-    const now = new Date().toISOString();
-
-    const insertPayload = {
-        id,
-        title: "Untitled",
-        description: "",
-        creator: user.email ?? "",   // ✅ email
-        owner_id: user.id ?? null,   // ✅ UUID
-        created_at: now,
-        updated_at: now
-    };
-
-    console.log("Insert payload:", insertPayload);
-
-    const { data, error } = await supabase
-        .from("documents")
-        .insert(insertPayload)
-        .select()
-        .single();
-
-    if (error) throw error;
-    console.log("Inserted doc:", data);
-
-    return data.id;
-}
-
+// =======================
+// UPDATE DOCUMENT ONLINE
+// =======================
 async function updateDocumentOnline(documentId) {
+    // --- Ensure user is logged in ---
     const user = await getCurrentUser();
-    if (!user) throw new Error("Usuario no autenticado");
+    if (!user) throw new Error("❌ Usuario no autenticado");
 
+    // --- Collect editor state ---
+    const content = gatherEditorContent(); // must return JSON-safe object
     const now = new Date().toISOString();
 
+    console.log("💾 Updating document:", documentId, {
+        creator: user.email,
+        owner_id: user.id,
+        updated_at: now,
+        content
+    });
+
+    // --- Update row in documents ---
     const { error } = await supabase
         .from("documents")
         .update({
+            content,                    // JSONB field
             updated_at: now,
-            creator: user.email ?? "",   // keep consistent
-            owner_id: user.id ?? null    // keep consistent
+            creator: user.email ?? "",
+            owner_id: user.id ?? null
         })
         .eq("id", documentId);
 
-    if (error) throw error;
+    if (error) {
+        console.error("❌ Error updating document:", error);
+        throw error;
+    }
+
+    console.log("✅ Document updated successfully");
 }
 
 
@@ -747,10 +733,12 @@ async function tryLoadNormalizedWithRetry(docId, retries = 3, delayMs = 500) {
             if (!doc) throw new Error("No normalized doc found");
 
             // Query organelles (assuming table: document_organelles)
+// CORRECT
             const { data: organelles, error: orgErr } = await supabase
-                .from("document_organelles")
+                .from("organelles")
                 .select("*")
                 .eq("document_id", docId);
+
 
             if (orgErr) throw new Error(`Supabase error [organelles]: ${orgErr.message}`);
 
@@ -789,3 +777,50 @@ async function loadDocumentById(docId) {
 
     return data;
 }
+
+// =======================
+// DOCUMENT LOADING
+// =======================
+window.addEventListener("DOMContentLoaded", async () => {
+    console.log("🔄 DOM ready, starting document load...");
+
+    try {
+        await refreshSignInUI();
+    } catch (err) {
+        console.error("⚠️ refreshSignInUI error:", err);
+    }
+
+    // --- Get docId ---
+    const params = new URLSearchParams(window.location.search);
+    const docId = params.get("id");
+
+    if (!docId) {
+        console.warn("⚠️ No docId in URL");
+        return;
+    }
+    console.log("📌 Document ID:", docId);
+
+    // --- Try normalized loader ---
+    try {
+        const { doc } = await tryLoadNormalizedWithRetry(docId);
+
+        if (doc?.content) {
+            populateEditorWithContent(doc.content);
+            console.log("✅ Loaded content:", doc.content);
+            return; // stop here if successful
+        }
+    } catch (err) {
+        console.error("❌ Failed normalized load:", err);
+    }
+
+    // --- Optional: Legacy fallback ---
+    try {
+        const legacyDoc = await loadDocumentById(docId);
+        if (legacyDoc?.content) {
+            populateEditorWithContent(legacyDoc.content);
+            console.log("✅ Loaded legacy content:", legacyDoc.content);
+        }
+    } catch (legacyErr) {
+        console.error("❌ Failed legacy load:", legacyErr);
+    }
+});

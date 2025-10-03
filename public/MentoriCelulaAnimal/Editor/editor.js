@@ -1,9 +1,7 @@
 // editor.js
-// Full rewrite: clean, single-file editor logic with Supabase storage uploads
-// -------------------------------------------------------------
-// NOTE: expects `export const supabase = createClient(...)` from /supabase.js
+// Full, corrected editor logic (documents -> organelles -> images + storage uploads)
+// Expects: `export const supabase = createClient(...)` from /supabase.js
 // and nanoid available from CDN as in your original setup.
-// -------------------------------------------------------------
 
 import { supabase } from '/supabase.js';
 import { nanoid } from 'https://cdn.jsdelivr.net/npm/nanoid/nanoid.js';
@@ -36,7 +34,7 @@ const returnHomeBtn = document.getElementById("return-homebtn");
 const signInBtn = document.getElementById("sign-in");
 const userDiv = document.getElementById("user");
 
-// Organelles (may be null if not present)
+// organelle label elements (may be absent)
 const membranacelular = document.getElementById('membrana celular');
 const citoplasma = document.getElementById('citoplasma');
 const nucleolo = document.getElementById('nucleolo');
@@ -87,7 +85,7 @@ function renderUser(user) {
 }
 
 (async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } = {} } = await supabase.auth.getSession();
     renderUser(session?.user ?? null);
 })();
 
@@ -96,10 +94,10 @@ supabase.auth.onAuthStateChange((_event, session) => {
 });
 
 // -----------------------------
-// Cursor / remove helpers
+// UI helpers: removable class / cursor
 // -----------------------------
 function updateRemovableClass(selector, state) {
-    document.querySelectorAll(selector).forEach(img => img.classList.toggle('removable', state));
+    document.querySelectorAll(selector).forEach(el => el.classList.toggle('removable', state));
 }
 function addBodyEraser() { document.body.classList.add('eraser-cursor'); }
 function removeBodyEraser() { document.body.classList.remove('eraser-cursor'); }
@@ -113,7 +111,7 @@ function exitAllRemoveModes() {
     removeBodyEraser();
 }
 
-// Cancel remove modes if clicking away
+// clicking outside images cancels remove modes
 document.addEventListener('click', (e) => {
     const t = e.target;
     const clickedMain = t.classList && t.classList.contains('main-image');
@@ -122,7 +120,7 @@ document.addEventListener('click', (e) => {
 });
 
 // -----------------------------
-// Attach handlers to image elements
+// Attach handlers to image elements (idempotent)
 // -----------------------------
 function attachMainImageBehavior(img) {
     if (!img || img.__mainHandlersAttached) return;
@@ -148,19 +146,18 @@ document.querySelectorAll('.main-image').forEach(attachMainImageBehavior);
 document.querySelectorAll('.pop-up-image').forEach(attachPopupImageBehavior);
 
 // -----------------------------
-// GATHER editor content (single version)
+// GATHER editor content
 // -----------------------------
-// GATHER
 function gatherEditorContent() {
     const saved = {
         description: document.getElementById("description")?.value || "",
-        // mainImages: array of objects { src, file?, name }
+        // mainImages: { src, file?, name }
         mainImages: [...(mainimagesContainer?.querySelectorAll("img") || [])].map((img, i) => ({
             src: img.src,
             file: img.file || img.dataset.file || null,
             name: img.dataset.name || `main-${i}-${Date.now()}.png`
         })),
-        // organelos: array { id, content, images: [ { src, file?, name } ] }
+        // organelos: { id, content, images: [ { src, file?, name } ] }
         organelos: []
     };
 
@@ -169,15 +166,12 @@ function gatherEditorContent() {
         const content = orgEl?.dataset?.content || "";
         let imagesArray = [];
         try {
-            if (orgEl.dataset?.image) {
-                imagesArray = JSON.parse(orgEl.dataset.image);
-            }
+            if (orgEl.dataset?.image) imagesArray = JSON.parse(orgEl.dataset.image);
         } catch (err) { imagesArray = []; }
 
-        // imagesArray in dataset is expected to be array of src strings; convert to objects
         const images = (imagesArray || []).map((src, i) => ({
             src,
-            file: null,
+            file: null, // when user adds via popup we attach file on the image element; for dataset strings there is no file
             name: `${id || 'org'}-img-${i}-${Date.now()}.png`
         }));
 
@@ -188,16 +182,14 @@ function gatherEditorContent() {
 }
 
 // -----------------------------
-// POPULATE editor from content (single version)
+// POPULATE editor with content
 // -----------------------------
-// POPULATE
 function populateEditorWithContent(data) {
     if (!data) return;
-
     const desc = document.getElementById("description");
     if (desc) desc.value = data.description || "";
 
-    // mainImages: either strings or objects
+    // mainImages can be strings or objects
     if (mainimagesContainer) {
         mainimagesContainer.innerHTML = "";
         (data.mainImages || []).forEach((mi, i) => {
@@ -215,26 +207,23 @@ function populateEditorWithContent(data) {
         });
     }
 
-    // organelos: map to DOM elements by id or by position
+    // organelos: map items to elements
     (data.organelos || []).forEach((item, idx) => {
         let target = item.id ? document.getElementById(item.id) : null;
         if (!target && organelos[idx]) target = organelos[idx];
         if (!target) return;
-
         target.dataset.content = item.content || "";
-        // store images as JSON array of src strings
         const imageSrcs = (item.images || item.image || []).map(x => (typeof x === 'string' ? x : x.src));
         target.dataset.image = JSON.stringify(imageSrcs);
     });
 }
 
 // -----------------------------
-// POPUP logic (open/add/save/close)
+// POPUP open / add images / save / close
 // -----------------------------
 if (organelos && organelos.length) {
     organelos.forEach(el => {
         el.addEventListener('click', () => {
-            // cancel main remove mode
             if (mainImageRemoveMode) {
                 mainImageRemoveMode = false;
                 updateRemovableClass('.main-image', false);
@@ -265,20 +254,19 @@ if (organelos && organelos.length) {
     });
 }
 
-// popup add button -> input click
+// popup add -> file input
 if (popupimageadd && popupimageinput) popupimageadd.addEventListener('click', () => popupimageinput.click());
 
-// popup image input handler (file -> dataURL + attach file)
+// popup file input handler (attach File to element)
 if (popupimageinput && popupimagecontainer) {
     popupimageinput.addEventListener("change", (e) => {
         const popupfile = e.target.files[0];
         if (!popupfile) return;
-
         const reader = new FileReader();
         reader.onload = (event) => {
             const popupimg = document.createElement('img');
             popupimg.src = event.target.result;
-            popupimg.file = popupfile;          // attach actual File object
+            popupimg.file = popupfile; // attach actual File
             popupimg.dataset.image = popupimg.src;
             popupimg.dataset.name = popupfile.name || `popup-${Date.now()}.png`;
             popupimg.classList.add('pop-up-image');
@@ -290,7 +278,7 @@ if (popupimageinput && popupimagecontainer) {
     });
 }
 
-// save popup (apply changes back to organelle element)
+// save popup: write back to organelle dataset attributes
 if (savepopup) {
     savepopup.addEventListener('click', () => {
         if (!currentOrganel) return;
@@ -316,7 +304,7 @@ if (closepopup) {
     });
 }
 
-// backdrop click closes and saves current popup to dataset image list
+// backdrop click saves popup changes and closes
 if (popup) {
     popup.addEventListener('click', (e) => {
         if (e.target === popup) {
@@ -335,7 +323,7 @@ if (popup) {
 }
 
 // -----------------------------
-// Main images (add/remove)
+// Main images add/remove
 // -----------------------------
 if (mainaddBtn && mainimageinput) mainaddBtn.addEventListener('click', () => mainimageinput.click());
 
@@ -343,7 +331,6 @@ if (mainimageinput && mainimagesContainer) {
     mainimageinput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
         const reader = new FileReader();
         reader.onload = (event) => {
             const img = document.createElement('img');
@@ -360,7 +347,7 @@ if (mainimageinput && mainimagesContainer) {
     });
 }
 
-// REMOVE toggles
+// REMOVE toggles for main/popup images
 if (mainremoveBtn) {
     mainremoveBtn.addEventListener('click', (ev) => {
         ev.stopPropagation();
@@ -396,11 +383,11 @@ if (popupimageremove) {
 if (savebtn) {
     savebtn.addEventListener('click', () => {
         const content = gatherEditorContent();
-        const blob = new Blob([JSON.stringify(content, null, 2)], { type: "text/plain" });
+        const blob = new Blob([JSON.stringify(content, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "dataset.txt";
+        a.download = "dataset.json";
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -409,41 +396,43 @@ if (savebtn) {
 }
 
 // -----------------------------
-// UPLOAD IMAGE helper (Storage + public URL)
+// Upload helper (supports File or dataURL string)
 // -----------------------------
-// UPLOAD IMAGE
 async function uploadImage(fileOrDataUrl, filename) {
     const user = await getCurrentUser();
     if (!user) throw new Error("Must be logged in to upload images");
 
-    // If dataURL passed (string), convert to blob
+    // convert dataURL to Blob if necessary
     let fileToUpload = fileOrDataUrl;
     if (typeof fileOrDataUrl === 'string' && fileOrDataUrl.startsWith('data:')) {
-        // convert Data URL to Blob
         const res = await fetch(fileOrDataUrl);
         fileToUpload = await res.blob();
     }
 
-    // create unique path under user id
-    const filePath = `${user.id}/${Date.now()}-${filename.replace(/\s+/g, '_')}`;
+    // Ensure filename is safe
+    const safeName = filename.replace(/[^\w.\-]/g, '_');
+    const filePath = `${user.id}/${Date.now()}-${safeName}`;
+
     const { error: uploadErr } = await supabase.storage.from("images").upload(filePath, fileToUpload, { cacheControl: '3600', upsert: false });
     if (uploadErr) {
-        // if bucket permissions or RLS cause issues, throw to caller
         throw uploadErr;
     }
+
     const { data } = supabase.storage.from("images").getPublicUrl(filePath);
     return data.publicUrl;
 }
 
 // -----------------------------
-// Supabase create/update/load helpers
+// Auth helper
 // -----------------------------
 async function getCurrentUser() {
     const { data } = await supabase.auth.getSession();
     return data?.session?.user ?? null;
 }
 
+// -----------------------------
 // CREATE document + organelles + images
+// -----------------------------
 async function createDocumentAndAssets(editorContent) {
     const user = await getCurrentUser();
     if (!user) throw new Error("Must be logged in to create document");
@@ -451,19 +440,19 @@ async function createDocumentAndAssets(editorContent) {
     const id = nanoid();
     const now = new Date().toISOString();
 
-    // Insert documents row
+    // insert document row (content saved too)
     const { error: docErr } = await supabase.from('documents').insert({
         id,
         creator: user.email,
         owner_id: user.id,
         created_at: now,
         updated_at: now,
-        content: editorContent   // <--- FIX
+        content: editorContent
     });
 
     if (docErr) throw docErr;
 
-    // Insert organelles & their images
+    // create organelles & images
     for (const organelle of (editorContent.organelos || [])) {
         const { data: organelleRow, error: orgErr } = await supabase.from('organelles')
             .insert({
@@ -477,9 +466,8 @@ async function createDocumentAndAssets(editorContent) {
 
         for (const img of (organelle.images || organelle.image || [])) {
             let finalUrl = img.src;
-            // if an actual File object or dataURL exists, upload it
             if (img.file) {
-                finalUrl = await uploadImage(img.file, img.name || `org-${organelleRow.id}-${Date.now()}.png`);
+                finalUrl = await uploadImage(img.file, img.name || `${organelleRow.id}-${Date.now()}.png`);
             }
             const { error: imgErr } = await supabase.from('images').insert({
                 organelle_id: organelleRow.id,
@@ -489,7 +477,7 @@ async function createDocumentAndAssets(editorContent) {
         }
     }
 
-    // Insert main images (document-level)
+    // main images
     for (const mi of (editorContent.mainImages || [])) {
         let finalUrl = mi.src;
         if (mi.file) {
@@ -505,22 +493,32 @@ async function createDocumentAndAssets(editorContent) {
     return id;
 }
 
-// UPDATE document: naive clear & reinsert strategy
+// -----------------------------
+// UPDATE document + assets (clear & reinsert)
+// -----------------------------
 async function updateDocumentAndAssets(documentId, editorContent) {
     const now = new Date().toISOString();
 
-    // update doc metadata
-    const { error: docErr } = await supabase.from('documents')
-        .update({
-            updated_at: now,
-            content: editorContent  // <--- FIX
-        })
-        .eq('id', documentId);
+    // update document's content and updated_at
+    const { error: docErr } = await supabase.from('documents').update({
+        updated_at: now,
+        content: editorContent
+    }).eq('id', documentId);
     if (docErr) throw docErr;
 
-    // remove existing organelles/images for this document (simple approach)
+    // fetch organelle ids for this document
+    const { data: existingOrganelles } = await supabase.from('organelles').select('id').eq('document_id', documentId);
+    const organelleIds = (existingOrganelles || []).map(r => r.id);
+
+    // delete images tied to document (document-level)
     await supabase.from('images').delete().eq('document_id', documentId);
-    await supabase.from('images').delete().in('organelle_id', supabase.from('organelles').select('id').eq('document_id', documentId));
+
+    // delete images tied to those organelles (if any)
+    if (organelleIds.length) {
+        await supabase.from('images').delete().in('organelle_id', organelleIds);
+    }
+
+    // delete organelles
     await supabase.from('organelles').delete().eq('document_id', documentId);
 
     // reinsert organelles & images
@@ -564,21 +562,23 @@ async function updateDocumentAndAssets(documentId, editorContent) {
     return true;
 }
 
-// LOAD document and transform rows into content JSON
+// -----------------------------
+// LOAD document and build editor-format content
+// -----------------------------
 async function loadDocumentById(id) {
     const { data: doc, error: docErr } = await supabase.from('documents').select('*').eq('id', id).maybeSingle();
     if (docErr) throw docErr;
     if (!doc) throw new Error("Document not found");
 
-    const { data: organelles, error: orgErr } = await supabase.from('organelles').select('*').eq('document_id', id);
+    const { data: organellesRows, error: orgErr } = await supabase.from('organelles').select('*').eq('document_id', id);
     if (orgErr) throw orgErr;
 
     const { data: docImages, error: diErr } = await supabase.from('images').select('*').eq('document_id', id);
     if (diErr) throw diErr;
 
-    // images per organelle
+    // organelle images lookup
     const organelleImages = {};
-    for (const o of organelles) {
+    for (const o of (organellesRows || [])) {
         const { data: imgs, error: imgErr } = await supabase.from('images').select('*').eq('organelle_id', o.id);
         if (imgErr) throw imgErr;
         organelleImages[o.name] = imgs || [];
@@ -589,7 +589,7 @@ async function loadDocumentById(id) {
         content: {
             description: doc.description,
             mainImages: (docImages || []).map(i => i.url),
-            organelos: (organelles || []).map(o => ({
+            organelos: (organellesRows || []).map(o => ({
                 id: o.name,
                 content: o.content,
                 image: (organelleImages[o.name] || []).map(i => i.url)
@@ -599,22 +599,19 @@ async function loadDocumentById(id) {
 }
 
 // -----------------------------
-// Copy button
+// Copy button (create duplicate doc)
 // -----------------------------
 if (copyBtn) {
     copyBtn.addEventListener('click', async () => {
         const content = gatherEditorContent();
         const user = await getCurrentUser();
-        if (!user) {
-            alert('Debes haber iniciado sesión para copiar un documento');
-            return;
-        }
+        if (!user) { alert('Debes iniciar sesión para copiar.'); return; }
         try {
             const newId = await createDocumentAndAssets(content);
             window.open(`/MentoriCelulaAnimal/Editor/editor.html?id=${newId}`, '_blank');
         } catch (err) {
-            console.error(err);
-            alert('Error al copiar: ' + (err.message || err.details || JSON.stringify(err)));
+            console.error("Copy error:", err);
+            alert('Error al copiar: ' + (err.message || JSON.stringify(err)));
         }
     });
 }
@@ -628,32 +625,33 @@ if (saveonlinebutton) {
         const docId = new URLSearchParams(window.location.search).get('id');
         try {
             const user = await getCurrentUser();
-            if (!user) return alert("Debes estar en una cuenta para poder guardar en linea.");
+            if (!user) return alert("Debes iniciar sesión para guardar en línea.");
 
             if (docId) {
-                const loaded = await loadDocumentById(docId); // used to check creator
-                if (!loaded) return alert("No se encontro el documento.");
-                if (loaded.creator !== user.email) return alert("Tú no eres el creador de este documento.");
+                const loaded = await loadDocumentById(docId); // to check creator
+                if (!loaded) return alert("No se encontró el documento.");
+                if (loaded.creator !== user.email) return alert("No eres el creador del documento.");
                 await updateDocumentAndAssets(docId, content);
                 alert("Documento actualizado!");
             } else {
                 const newId = await createDocumentAndAssets(content);
                 alert("Documento guardado en línea!");
+                // navigate to new doc
                 window.location.href = `../Editor/editor.html?id=${newId}`;
             }
         } catch (err) {
             console.error("Save online error:", err);
-            alert("Error al guardar en línea: " + (err.message || err.details || JSON.stringify(err)));
+            alert("Error al guardar en línea: " + (err.message || JSON.stringify(err)));
         }
     });
 }
 
 // -----------------------------
-// LOAD local .txt dataset
+// Local load from .txt/.json
 // -----------------------------
 if (loadBtn && loadInput) {
-    loadBtn.addEventListener('click', () => loadInput.click());
-    loadInput.addEventListener('change', (e) => {
+    loadBtn.addEventListener("click", () => loadInput.click());
+    loadInput.addEventListener("change", (e) => {
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
@@ -663,8 +661,8 @@ if (loadBtn && loadInput) {
                 populateEditorWithContent(data);
                 alert("Contenido cargado correctamente!");
             } catch (err) {
-                console.error(err);
-                alert("Error: El archivo no es un JSON válido.");
+                console.error("Local load parse error:", err);
+                alert("El archivo no es un JSON válido.");
             }
         };
         reader.readAsText(file);
@@ -673,7 +671,7 @@ if (loadBtn && loadInput) {
 }
 
 // -----------------------------
-// Auto-load dataset & authorize
+// Auto-load on DOMContentLoaded + authorization checks
 // -----------------------------
 async function refreshSignInUI() {
     const user = await getCurrentUser();
@@ -690,7 +688,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         if (!doc) { alert("Documento no encontrado."); window.location.href = "../Viewer/view.html"; return; }
         const user = await getCurrentUser();
         if (!user || user.email !== doc.creator) {
-            alert("No tienes autorización para editar este documento — redirigiendo a vista...");
+            alert("No tienes autorización para editar este documento. Redirigiendo a la vista...");
             window.location.href = `../Viewer/view.html?id=${docId}`;
             return;
         }
@@ -703,7 +701,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 // -----------------------------
-// Return home, viewer switch, names
+// Return home, switch to viewer, organelle hover names
 // -----------------------------
 if (returnHomeBtn) returnHomeBtn.addEventListener('click', () => window.location.href = "/index.html");
 
@@ -735,4 +733,4 @@ setupOrganelName(mitocondrias, "Mitocondrias");
 setupOrganelName(lisosomas, "Lisosomas");
 setupOrganelName(aparatodegolgi, "Aparato de Golgi");
 
-// End of file
+// End of editor.js

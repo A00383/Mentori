@@ -71,8 +71,8 @@ async function login() {
     });
 
     if (error) {
-        console.error("Login error:", error.message);
-        alert("Login failed: " + error.message);
+        console.error("Inicio de sesión fallido:", error.message);
+        alert("Inicio de sesión fallido: " + error.message);
     }
 }
 
@@ -83,7 +83,7 @@ async function logout() {
     const { error } = await supabase.auth.signOut();
     if (error) {
         console.error("Logout error:", error.message);
-        alert("Logout failed: " + error.message);
+        alert("Falla al cerrar sesión: " + error.message);
         return;
     }
 
@@ -218,7 +218,7 @@ if (savebtn) {
 // -----------------------------
 if (saveonlinebutton) {
     saveonlinebutton.addEventListener("click", () => {
-        alert("Online save is not available in Viewer mode.");
+        alert("Guardado online no disponible en modo vista.");
     });
 }
 
@@ -242,7 +242,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     try {
         const doc = await loadDocumentById(docId);
         if (!doc) {
-            alert("Document not found.");
+            alert("Documento no encontrado.");
             return;
         }
 
@@ -255,7 +255,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     } catch (err) {
         console.error("Failed to load document:", err);
-        alert("Error loading document.");
+        alert("Error al cargar el contenido.");
     }
 });
 
@@ -268,20 +268,20 @@ if (copyBtn) {
     copyBtn.addEventListener('click', async () => {
         const docId = new URLSearchParams(window.location.search).get("id");
         if (!docId) {
-            alert("No document to copy.");
+            alert("No se encontro un documento que copiar.");
             return;
         }
 
         try {
             const originalDoc = await loadDocumentById(docId);
             if (!originalDoc) {
-                alert("Document not found.");
+                alert("Documento no encontrado.");
                 return;
             }
 
             const user = await getCurrentUser();
             if (!user) {
-                alert("You must be logged in to copy documents.");
+                alert("Debes estar dentro de una sesión para crear una copia.");
                 return;
             }
 
@@ -306,12 +306,12 @@ if (copyBtn) {
             if (data && data.id) {
                 window.location.href = `../Editor/editor.html?id=${encodeURIComponent(data.id)}`;
             } else {
-                alert("Failed to create a copy.");
+                alert("Error al crear copia.");
             }
 
         } catch (err) {
             console.error("Copy failed:", err);
-            alert("Error copying document: " + (err.message || err));
+            alert("Error al copiar el documento: " + (err.message || err));
         }
     });
 }
@@ -329,9 +329,9 @@ if (loadBtn && loadInput) {
             try {
                 const data = JSON.parse(event.target.result);
                 populateViewerWithContent(data);
-                alert("Datasets loaded successfully!");
+                alert("Contenido cargado correctamente!");
             } catch {
-                alert("Error: file is not valid JSON.");
+                alert("Error: el archivo no es un JSON valido.");
             }
         };
         reader.readAsText(file);

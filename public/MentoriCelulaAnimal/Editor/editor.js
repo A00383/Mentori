@@ -511,7 +511,7 @@ if (copyBtn) {
         const user = await getCurrentUser();
 
         if (!user) {
-            alert('You must be signed in to copy this document.');
+            alert('Debes haber iniciado sesión para copiar un documento');
             return;
         }
 
@@ -523,7 +523,7 @@ if (copyBtn) {
             window.open(`/MentoriCelulaAnimal/Editor/editor.html?id=${newId}`, '_blank');
         } catch (err) {
             console.error(err);
-            alert('Failed to copy document: ' + err.message);
+            alert('Error al copiar el documento: ' + err.message);
         }
     });
 }
@@ -538,12 +538,12 @@ if (saveonlinebutton) {
 
         try {
             const user = await getCurrentUser();
-            if (!user) return alert("You must be logged in to save online.");
+            if (!user) return alert("Debes estar en una cuenta para poder guardar en linea.");
 
             if (docId) {
                 const doc = await loadDocumentById(docId);
-                if (!doc) return alert("Document not found.");
-                if (doc.creator !== user.email) return alert("You are not the creator of this document.");
+                if (!doc) return alert("No se encontro el documento.");
+                if (doc.creator !== user.email) return alert("Tú no eres el creador de este documento.");
 
                 await updateDocument(docId, content);
                 alert("Document saved successfully!");
@@ -555,7 +555,7 @@ if (saveonlinebutton) {
             }
         } catch (err) {
             console.error(err);
-            alert("Error saving document: " + err.message);
+            alert("Error al guardar el documento: " + err.message);
         }
     });
 }
@@ -573,9 +573,9 @@ if (loadBtn && loadInput) {
             try {
                 const data = JSON.parse(event.target.result);
                 populateEditorWithContent(data);
-                alert("Datasets loaded successfully!");
+                alert("Centenido cargado correctamente!");
             } catch {
-                alert("Error: file is not valid JSON.");
+                alert("Error: El archivo no es un JSON valido.");
             }
         };
         reader.readAsText(file);
@@ -608,7 +608,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     try {
         const doc = await loadDocumentById(docId);
         if (!doc) {
-            alert("Document not found.");
+            alert("Documento no encontrado.");
             window.location.href = "../Viewer/view.html";
             return;
         }
@@ -616,7 +616,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         const user = await getCurrentUser();
 
         if (!user || user.email !== doc.creator) {
-            alert("You are not authorized to edit this document. Redirecting to viewer...");
+            alert("No tienes la autorización para editar este documento, enviandote a la versión de vista...");
             window.location.href = `../Viewer/view.html?id=${docId}`;
             return;
         }
@@ -626,7 +626,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     } catch (err) {
         console.error("Failed to load document:", err);
-        alert("Error loading document. Redirecting to viewer...");
+        alert("Ha ocurrido un error cargando el documento, redirigiendote a la versión de vista...");
         window.location.href = `../Viewer/view.html?id=${docId}`;
     }
 });

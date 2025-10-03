@@ -17,6 +17,7 @@ const popupimageadd = document.getElementById("pop-up-image-add");
 const popupimageremove = document.getElementById("pop-up-image-remove");
 const popupimagecontainer = document.getElementById("pop-up-image-section-images");
 const savebtn = document.getElementById("savebtn");
+const switchviewbtn = document.getElementById("switch-mode-btn");
 const saveonlinebutton = document.getElementById("save-online-btn");
 const loadInput = document.getElementById("mainload");
 const loadBtn = document.getElementById("loadbtn");
@@ -670,5 +671,21 @@ if ("serviceWorker" in navigator) {
             registration.unregister();
             console.log("Unregistered service worker:", registration);
         }
+    });
+}
+
+// ------------------------------
+// Switch to Viewer Mode
+// ------------------------------
+if (switchviewbtn) {
+    switchviewbtn.addEventListener("click", () => {
+        const docId = new URLSearchParams(window.location.search).get("id");
+        if (!docId) {
+            alert("No se encontró un ID de documento. Guarda el documento antes de cambiar a modo visor.");
+            return;
+        }
+        const viewerUrl = `https://mentorigroup.com/MentoriCelulaAnimal/Viewer/view.html?id=${docId}`;
+        window.open(viewerUrl, "_blank"); // opens in new tab
+        // Or use window.location.href = viewerUrl; if you want to replace instead of opening
     });
 }

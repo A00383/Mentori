@@ -3,6 +3,16 @@
     padding: 0;
 }
 
+textarea {
+    font-family: "Century Gothic", CenturyGothic, AppleGothic, sans-serif;
+}
+
+#description,
+#pop-up-message {
+    padding: 8px 10px; /* top/bottom 8px, left/right 10px */
+    box-sizing: border-box; /* so padding doesn’t mess with width */
+}
+
 body {
     background-color: white;
 }

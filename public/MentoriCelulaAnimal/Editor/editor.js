@@ -601,8 +601,6 @@ async function loadDocumentById(id) {
 // =======================
 // EVENT HANDLERS
 // =======================
-const saveonlinebutton = document.getElementById("save-online-btn");
-const copyBtn = document.getElementById("copybtn");
 
 // --- SAVE ONLINE ---
 if (saveonlinebutton) {

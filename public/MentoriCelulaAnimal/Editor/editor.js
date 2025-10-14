@@ -71,9 +71,9 @@ const SUPABASE_PUBLIC_BASE = ""; // not used directly; we use getPublicUrl per f
 const ORGANELLE_COLUMN_MAP = {
     // DOM element id            // SQL column
     "membrana celular": "membrana_celular_content",
-    "citoplasma": "citoplasma_content", // matches your provided SQL (typo preserved)
+    "citoplasma": "citoplasma_content",
     "nucleolo": "nucleolo_content",
-    "nucleo": "nucleo", // your schema used 'nucleo' without _content
+    "nucleo": "nucleo_content",
     "reticulo endoplasmatico": "reticulo_endoplasmatico_content",
     "centriolos": "centriolos_content",
     "microtubulos": "microtubulos_content",

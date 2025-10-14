@@ -515,7 +515,7 @@ async function createDocument(editorContent) {
         id,
         title: 'Untitled',
         description: null,
-        content: editorContent?.description ?? null,
+        content: { description: editorContent?.description ?? "" },
         creator: user.email,
         owner_id: user.id,
         created_at: now,
@@ -530,7 +530,7 @@ async function createDocument(editorContent) {
 async function updateDocument(id, editorContent) {
     const now = new Date().toISOString();
     const { error } = await supabase.from('documents')
-        .update({ content: editorContent?.description ?? null, updated_at: now })
+        .update({ content: { description: editorContent?.description ?? "" }, updated_at: now })
         .eq('id', id);
 
     if (error) throw error;
@@ -776,7 +776,7 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
             const blob = await getBlobFromSrc(src);
             const ext = extensionFromMime(blob.type);
             // Build deterministic filename - timestamp + index to avoid clashes
-            const filename = `main_imgs/img_${Date.now()}_${i}.${ext}`;
+            const filename = `main_imgs/img_${i}_${crypto.randomUUID()}.${ext}`;
             const path = `${documentId}/${filename}`;
 
             // Upload and get public url
@@ -814,7 +814,7 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
                 }
                 const blob = await getBlobFromSrc(src);
                 const ext = extensionFromMime(blob.type);
-                const filename = `${folderName}/img_${Date.now()}_${i}.${ext}`;
+                const filename = `${folderName}/img_${i}_${crypto.randomUUID()}.${ext}`;
                 const path = `${documentId}/${filename}`;
                 const publicUrl = await uploadBlobToBucket(blob, path);
                 newUrls.push(publicUrl);
@@ -871,8 +871,8 @@ async function upsertOrganellesText(documentId, editorContent) {
     // also handle any organeles that exist in the DOM but not in the mapping (defensive)
     // we won't write them to DB but we might console.warn
     const { error } = await supabase
-        .from('organelles')
-        .upsert(payload, { onConflict: 'id' }); // upsert by primary key 'id'
+        .from('organelles') // <-- make sure this matches your exact Supabase table name
+        .upsert(payload, { onConflict: 'document_id' });
 
     if (error) {
         // try fallback: insert or update separately to provide clearer error

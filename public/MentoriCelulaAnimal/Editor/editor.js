@@ -1,6 +1,10 @@
-// editor.js — fixed, full file with login/logout rendering
+// editor.js — rewritten to store description in documents.content, organelle texts in organelles table,
+// and upload images to Supabase Storage bucket "CelulaAnimalImgs". Local .txt export still contains Base64
+// as before. Original DOM event bindings and function names are preserved.
+
 // -----------------------------
 // Top-level imports (must be at top)
+// -----------------------------
 import { supabase } from '/supabase.js';
 import { nanoid } from 'https://cdn.jsdelivr.net/npm/nanoid/nanoid.js';
 
@@ -52,6 +56,38 @@ let currentogranel = null;
 let popupimageremoveMode = false;
 let mainimageremoveMode = false;
 
+// -----------------------------
+// Configuration
+// -----------------------------
+const IMGS_BUCKET = "CelulaAnimalImgs";
+const BUCKET_ROOT_FOLDER = ""; // root within bucket; kept blank so we upload as `${docId}/...`
+const SUPABASE_PUBLIC_BASE = ""; // not used directly; we use getPublicUrl per file
+
+// -----------------------------
+// Organelles -> DB column mapping
+// Note: columns come from the SQL you supplied. There are some naming differences
+// (e.g. 'citplasma_content' in your SQL; we map safely).
+// -----------------------------
+const ORGANELLE_COLUMN_MAP = {
+    // DOM element id            // SQL column
+    "membrana celular": "membrana_celular_content",
+    "citoplasma": "citplasma_content", // matches your provided SQL (typo preserved)
+    "nucleolo": "nucleolo_content",
+    "nucleo": "nucleo", // your schema used 'nucleo' without _content
+    "reticulo endoplasmatico": "reticulo_endoplasmatico_content",
+    "centriolos": "centriolos_content",
+    "microtubulos": "microtubulos_content",
+    "mitocondrias": "mitocondrias_content",
+    "lisosomas": "lisosomas_content",
+    "aparato de golgi": "aparato_de_golgi_content",
+    "ribosomas": "ribosomas_content"
+};
+
+// Utility to get safe folder name for an organelle (no spaces, lowercase)
+function organelleFolderName(domId) {
+    if (!domId) return "";
+    return domId.replace(/\s+/g, '_').toLowerCase();
+}
 
 // -----------------------------
 // AUTH HELPERS (added)
@@ -84,7 +120,6 @@ function renderUser(user) {
         document.getElementById("login")?.addEventListener("click", login);
     }
 }
-
 
 (async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -137,7 +172,6 @@ document.addEventListener('click', (e) => {
     }
 });
 
-
 // -----------------------------
 // Helper: attach handlers to images (main & popup)
 // -----------------------------
@@ -154,7 +188,6 @@ function attachMainImageBehavior(img) {
     });
 }
 
-
 function attachPopupImageBehavior(img) {
     if (!img || img.__popupHandlersAttached) return;
     img.__popupHandlersAttached = true;
@@ -167,7 +200,6 @@ function attachPopupImageBehavior(img) {
     });
 }
 
-
 // Attach handlers to currently existing images (defensive)
 document.querySelectorAll('.main-image').forEach(attachMainImageBehavior);
 document.querySelectorAll('.pop-up-image').forEach(attachPopupImageBehavior);
@@ -175,6 +207,8 @@ document.querySelectorAll('.pop-up-image').forEach(attachPopupImageBehavior);
 // -----------------------------
 // Helper: Gather editor content (fixed variable naming)
 // -----------------------------
+// IMPORTANT: keep the same function name and return shape so local save still works unchanged.
+// This gathers current editor state into an object. For local save we keep Base64 image data (if present).
 function gatherEditorContent() {
     const savedataexport = {
         description: document.getElementById("description")?.value || "",
@@ -183,7 +217,6 @@ function gatherEditorContent() {
     };
 
     Array.from(organelos).forEach((organelo) => {
-        // Use organelo variable consistently
         const id = organelo?.id ?? (organelo ? organelo.id : null);
         const content = organelo?.dataset?.content ?? (organelo.dataset?.content || "");
         let imagesArray = [];
@@ -207,6 +240,7 @@ function gatherEditorContent() {
 // -----------------------------
 // Helper: Populate editor with content
 // -----------------------------
+// This is used by local-load (JSON file import). It expects data shape identical to gatherEditorContent.
 function populateEditorWithContent(data) {
     if (!data) return;
     const descElem = document.getElementById("description");
@@ -279,6 +313,8 @@ if (popupimageadd && popupimageinput) {
 }
 
 // popup image input (file -> dataURL -> image element)
+// NOTE: still uses readAsDataURL for client-side preview + local save behavior (Base64).
+// When saving online we'll upload the original file (we keep a reference in the <img>.src as Base64 for local export).
 if (popupimageinput && popupimagecontainer) {
     popupimageinput.addEventListener("change", (e) => {
         const popupfile = e.target.files[0];
@@ -287,8 +323,9 @@ if (popupimageinput && popupimagecontainer) {
         const reader = new FileReader();
         reader.onload = (event) => {
             const popupimg = document.createElement("img");
-            popupimg.src = event.target.result;
+            popupimg.src = event.target.result; // data URL (Base64)
             popupimg.classList.add("pop-up-image");
+            // store the data URL on dataset as in the original implementation; used by local save
             popupimg.dataset.image = popupimg.src;
 
             attachPopupImageBehavior(popupimg);
@@ -298,7 +335,6 @@ if (popupimageinput && popupimagecontainer) {
         popupimageinput.value = "";
     });
 }
-
 
 // save popup (apply changes back to organelle)
 if (savepopup) {
@@ -364,11 +400,11 @@ if (mainimageinput && mainimagesContainer) {
         const reader = new FileReader();
         reader.onload = (event) => {
             const img = document.createElement("img");
-            img.src = event.target.result;
+            img.src = event.target.result; // data URL for preview and local export
             img.classList.add("main-image");
             img.dataset.src = img.src;
 
-            // Attach removal + hover handlers (safe: these handlers check the mode at runtime)
+            // Attach removal + hover handlers
             attachMainImageBehavior(img);
 
             mainimagesContainer.appendChild(img);
@@ -441,6 +477,8 @@ if (popupimageremove) {
 // -----------------------------
 // Local save (.txt)
 // -----------------------------
+// This behavior is unchanged: we export the entire structure (including Base64 data URLs if present)
+// into a JSON file which the user can re-import.
 if (savebtn) {
     savebtn.addEventListener("click", () => {
         const content = gatherEditorContent();
@@ -465,6 +503,8 @@ async function getCurrentUser() {
     return data?.session?.user ?? null;
 }
 
+// createDocument now expects an editorContent object (the same object returned by gatherEditorContent),
+// but only stores description into documents.content (per your requirements).
 async function createDocument(editorContent) {
     const user = await getCurrentUser();
     if (!user) throw new Error('Must be logged-in to save document');
@@ -473,20 +513,24 @@ async function createDocument(editorContent) {
     const now = new Date().toISOString();
     const { error } = await supabase.from('documents').insert({
         id,
+        title: 'Untitled',
+        description: null,
+        content: editorContent?.description ?? null,
         creator: user.email,
+        owner_id: user.id,
         created_at: now,
-        updated_at: now,
-        content: editorContent
+        updated_at: now
     });
 
     if (error) throw error;
     return id;
 }
 
+// updateDocument will update only the content (description) field on documents table
 async function updateDocument(id, editorContent) {
     const now = new Date().toISOString();
     const { error } = await supabase.from('documents')
-        .update({ content: editorContent, updated_at: now })
+        .update({ content: editorContent?.description ?? null, updated_at: now })
         .eq('id', id);
 
     if (error) throw error;
@@ -503,6 +547,116 @@ async function loadDocumentById(id) {
     return data;
 }
 
+// -----------------------------
+// Storage helpers (uploading / listing / getting public URLs)
+// -----------------------------
+/**
+ * Upload a Blob/File to Supabase storage, path is like `${docId}/main_imgs/img0.png`.
+ * Returns public URL string.
+ */
+async function uploadBlobToBucket(blobOrFile, path) {
+    if (!blobOrFile) throw new Error('No file/blob provided to uploadBlobToBucket');
+
+    // supabase.storage upload expects a File or Blob; we'll provide blobOrFile as-is
+    const { data, error } = await supabase.storage
+        .from(IMGS_BUCKET)
+        .upload(path, blobOrFile, { upsert: true });
+
+    if (error) {
+        // If file already exists and upsert failed, still try to continue by returning public URL if possible.
+        throw error;
+    }
+
+    // get public url
+    const { data: publicData, error: publicErr } = await supabase.storage
+        .from(IMGS_BUCKET)
+        .getPublicUrl(path);
+
+    if (publicErr) {
+        throw publicErr;
+    }
+
+    // different supabase SDK versions return slightly different shapes; handle both
+    const publicUrl = (publicData && (publicData.publicUrl || publicData.public_url)) || null;
+    return publicUrl;
+}
+
+/**
+ * List files in the given folder path within the bucket.
+ * Returns array of file metadata objects ({name, ...}) or empty array.
+ */
+async function listBucketFiles(folderPath) {
+    const { data, error } = await supabase.storage
+        .from(IMGS_BUCKET)
+        .list(folderPath || '', { limit: 1000, offset: 0 });
+
+    if (error) {
+        // don't throw in listing - return empty array to allow the UI to continue (but log)
+        console.warn('listBucketFiles error:', error);
+        return [];
+    }
+    return data || [];
+}
+
+/**
+ * Given a path in the bucket, return the public URL.
+ */
+function getPublicUrlForPath(path) {
+    const { data } = supabase.storage.from(IMGS_BUCKET).getPublicUrl(path);
+    // support different shapes
+    return (data && (data.publicUrl || data.public_url)) || null;
+}
+
+/**
+ * Convert a dataURL (data:...base64,...) into a Blob.
+ */
+function dataURLToBlob(dataURL) {
+    const parts = dataURL.split(',');
+    const header = parts[0];
+    const base64 = parts[1];
+    const matches = header.match(/data:(.*?);base64/);
+    const contentType = matches ? matches[1] : 'application/octet-stream';
+    const byteString = atob(base64);
+    const arrayBuffer = new ArrayBuffer(byteString.length);
+    const intArray = new Uint8Array(arrayBuffer);
+    for (let i = 0; i < byteString.length; i++) {
+        intArray[i] = byteString.charCodeAt(i);
+    }
+    return new Blob([intArray], { type: contentType });
+}
+
+/**
+ * Given an image src, try to produce a Blob:
+ * - if src is a data URL -> convert to Blob
+ * - otherwise attempt fetch(src) and return response.blob()
+ */
+async function getBlobFromSrc(src) {
+    if (!src) throw new Error('No src provided to getBlobFromSrc');
+    if (src.startsWith('data:')) {
+        return dataURLToBlob(src);
+    }
+    // If it's already a public URL we could optionally skip re-uploading.
+    // But to be robust, try fetching it and returning a blob so we can re-upload into our bucket.
+    const resp = await fetch(src);
+    if (!resp.ok) throw new Error(`Failed to fetch image: ${resp.status}`);
+    return await resp.blob();
+}
+
+/**
+ * Determine file extension from a blob.type (MIME) or fallback extension
+ */
+function extensionFromMime(mime) {
+    if (!mime) return 'png';
+    const parts = mime.split('/');
+    if (parts.length === 2) {
+        const ext = parts[1].split('+')[0]; // handle image/svg+xml etc.
+        // normalize some common types
+        if (ext === 'jpeg') return 'jpg';
+        return ext;
+    }
+    return 'png';
+}
+
 // ------------------------------
 // Copy Button
 // ------------------------------
@@ -517,8 +671,15 @@ if (copyBtn) {
         }
 
         try {
-            // Create new document with same content
+            // Create new document with same content (only description will be stored in documents.content)
             const newId = await createDocument(content);
+
+            // Upload images to bucket for the new document (so the copied doc is complete)
+            // We reuse the same upload routine as save-online below but simplified (no permission checks needed)
+            await uploadAllImagesForDocument(newId, content);
+
+            // Create organelles row for new doc with text content
+            await upsertOrganellesText(newId, content);
 
             // Open new editor window with new document
             window.open(`/MentoriCelulaAnimal/Editor/editor.html?id=${newId}`, '_blank');
@@ -530,28 +691,49 @@ if (copyBtn) {
 }
 
 // -----------------------------
-// Save online (create or update)
+// Save online (create or update) — NEW behavior
+// - documents.content stores ONLY the description (text area).
+// - organelles table stores each organelle's textual content in its corresponding column.
+// - images (main + organelle) are uploaded to Supabase Storage bucket under folder named after the document id.
+// - local save behavior remains unchanged.
 // -----------------------------
 if (saveonlinebutton) {
     saveonlinebutton.addEventListener("click", async () => {
         const content = gatherEditorContent();
-        const docId = new URLSearchParams(window.location.search).get("id");
+        const currentDocId = new URLSearchParams(window.location.search).get("id");
 
         try {
             const user = await getCurrentUser();
             if (!user) return alert("Debes estar en una cuenta para poder guardar en linea.");
 
-            if (docId) {
-                const doc = await loadDocumentById(docId);
+            // if docId exists -> load and check ownership
+            if (currentDocId) {
+                const doc = await loadDocumentById(currentDocId);
                 if (!doc) return alert("No se encontro el documento.");
                 if (doc.creator !== user.email) return alert("Tú no eres el creador de este documento.");
 
-                await updateDocument(docId, content);
+                // Update documents.content with description only
+                await updateDocument(currentDocId, content);
+
+                // Upload images for this document into bucket
+                await uploadAllImagesForDocument(currentDocId, content);
+
+                // Upsert organelles text content into organelles table
+                await upsertOrganellesText(currentDocId, content);
+
                 alert("Documento guardado exitosamente!");
             } else {
+                // create a new document and then upload assets
                 const newId = await createDocument(content);
+
+                // upload images to bucket
+                await uploadAllImagesForDocument(newId, content);
+
+                // upsert organelles text (create row)
+                await upsertOrganellesText(newId, content);
+
                 alert("Documento guardado exitosamente!");
-                // Redirect using absolute path from root
+                // Redirect to editor with new id
                 window.location.href = `../Editor/editor.html?id=${newId}`;
             }
         } catch (err) {
@@ -559,6 +741,144 @@ if (saveonlinebutton) {
             alert("Error al guardar el documento: " + err.message);
         }
     });
+}
+
+/**
+ * Upload all images present in the editor (main images + organelle images) to the bucket
+ * under folders named after documentId.
+ *
+ * Behavior:
+ * - For each main image element src:
+ *    - if src startsWith('data:') -> convert to Blob and upload
+ *    - else if src looks like already uploaded to our bucket -> skip or keep as-is
+ *    - else attempt to fetch and upload (best-effort)
+ *
+ * - For each organelle: process its dataset.image (JSON array of src strings) similarly and upload to
+ *  : `${documentId}/{organelFolder}/img{index}.{ext}`
+ *
+ * This function returns an object with public URLs if needed, but we don't strictly require it.
+ */
+async function uploadAllImagesForDocument(documentId, editorContent) {
+    if (!documentId) throw new Error("uploadAllImagesForDocument requires a documentId");
+
+    // --- MAIN IMAGES ---
+    const mainImgs = [...(mainimagesContainer?.querySelectorAll("img") || [])];
+    for (let i = 0; i < mainImgs.length; i++) {
+        const src = mainImgs[i].src;
+        try {
+            // If src is already a public URL pointing to our bucket, skip reupload
+            if (src && src.startsWith('http') && src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
+                // already in bucket and public; skip
+                continue;
+            }
+
+            // Get a blob from the src (data URL or remote fetch)
+            const blob = await getBlobFromSrc(src);
+            const ext = extensionFromMime(blob.type);
+            // Build deterministic filename - timestamp + index to avoid clashes
+            const filename = `main_imgs/img_${Date.now()}_${i}.${ext}`;
+            const path = `${documentId}/${filename}`;
+
+            // Upload and get public url
+            const publicUrl = await uploadBlobToBucket(blob, path);
+
+            // Replace the <img>.src in the editor with the public URL so future saves don't re-upload unnecessarily.
+            mainImgs[i].src = publicUrl;
+            mainImgs[i].dataset.src = publicUrl;
+        } catch (err) {
+            console.warn("Failed to upload main image:", err);
+            // keep going for other images
+        }
+    }
+
+    // --- ORGANELE IMAGES ---
+    for (const organel of organelos) {
+        // parse dataset.image
+        let imgs = [];
+        try {
+            imgs = JSON.parse(organel.dataset.image || "[]");
+        } catch (err) {
+            imgs = [];
+        }
+
+        const folderName = organelleFolderName(organel.id || organel.dataset?.organelId || 'unknown');
+
+        const newUrls = [];
+        for (let i = 0; i < imgs.length; i++) {
+            const src = imgs[i];
+            try {
+                // If src already points to our public bucket, keep it
+                if (src && src.startsWith('http') && src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
+                    newUrls.push(src);
+                    continue;
+                }
+                const blob = await getBlobFromSrc(src);
+                const ext = extensionFromMime(blob.type);
+                const filename = `${folderName}/img_${Date.now()}_${i}.${ext}`;
+                const path = `${documentId}/${filename}`;
+                const publicUrl = await uploadBlobToBucket(blob, path);
+                newUrls.push(publicUrl);
+            } catch (err) {
+                console.warn(`Failed to upload image for organelle ${organel.id}:`, err);
+                // fallback: keep original src in case it is still usable
+                if (src) newUrls.push(src);
+            }
+        }
+
+        // After uploading all images for this organelle, update the dataset.image to the public URLs array
+        try {
+            organel.dataset.image = JSON.stringify(newUrls);
+        } catch (err) {
+            // ignore
+        }
+    }
+
+    // Return optionally a summary of the uploaded assets (not used by caller right now)
+    return true;
+}
+
+/**
+ * Upsert organelle textual contents into the organelles table for the given documentId.
+ * The organelles table has one row per document (id) and many columns (one per organelle).
+ *
+ * We build a row object where:
+ * - id = nanoid() or `${documentId}-org` (use deterministic id tied to document)
+ * - document_id = documentId
+ * - creator = current user email
+ * - then set each column to organelle.dataset.content or empty string/null
+ *
+ * If a row already exists for this document_id we perform an upsert (update).
+ */
+async function upsertOrganellesText(documentId, editorContent) {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Must be logged-in to write organelle text');
+
+    // Build payload
+    const payload = {
+        id: `${documentId}-organelles`, // deterministic id so upserts are easy
+        document_id: documentId,
+        creator: user.email
+    };
+
+    // For each organelle in ORGANELLE_COLUMN_MAP try to read its content from the DOM
+    for (const domId in ORGANELLE_COLUMN_MAP) {
+        const colName = ORGANELLE_COLUMN_MAP[domId];
+        const el = document.getElementById(domId);
+        const content = el?.dataset?.content ?? "";
+        payload[colName] = content;
+    }
+
+    // also handle any organeles that exist in the DOM but not in the mapping (defensive)
+    // we won't write them to DB but we might console.warn
+    const { error } = await supabase
+        .from('organelles')
+        .upsert(payload, { onConflict: 'id' }); // upsert by primary key 'id'
+
+    if (error) {
+        // try fallback: insert or update separately to provide clearer error
+        throw error;
+    }
+    return true;
 }
 
 // -----------------------------
@@ -586,6 +906,16 @@ if (loadBtn && loadInput) {
 
 // -----------------------------
 // Auto-load dataset & enforce creator-only access
+//    On page load (DOMContentLoaded) we:
+//     - refresh sign-in UI
+//     - if docId present: load document row from documents table
+//         - if not found -> redirect to viewer
+//         - if user != creator -> redirect to viewer
+//         - populate editor with local-style content if doc.content is JSON (backwards compat)
+//         - populate description from documents.content
+//         - load main images list from bucket folder `${docId}/main_imgs` and add images to mainimagesContainer
+//         - load organelles text from organelles table and set dataset.content
+//         - load organelle images from bucket folder `${docId}/{organelFolder}` and set dataset.image to JSON array of public urls
 // -----------------------------
 async function refreshSignInUI() {
     const user = await getCurrentUser();
@@ -607,6 +937,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (!docId) return;
 
     try {
+        // 1) Load document row
         const doc = await loadDocumentById(docId);
         if (!doc) {
             alert("Documento no encontrado.");
@@ -622,8 +953,99 @@ window.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // Populate editor with content
-        if (doc.content) populateEditorWithContent(doc.content);
+        // 2) Populate description (documents.content stores only description per your spec)
+        if (doc.content) {
+            const descElem = document.getElementById("description");
+            if (descElem) descElem.value = doc.content;
+        }
+
+        // 3) Try to populate from doc.content if it contains JSON (legacy support)
+        // If doc.content is actually JSON with the old shape, allow populateEditorWithContent to run.
+        // This keeps backwards compatibility for older documents that were saved as full JSON objects.
+        try {
+            // If content is JSON text (starts with { or [ ) attempt parse and populate
+            if (typeof doc.content === 'string' && (doc.content.trim().startsWith('{') || doc.content.trim().startsWith('['))) {
+                // Attempt parsing
+                const parsed = JSON.parse(doc.content);
+                // populateEditorWithContent expects the shape from gatherEditorContent
+                populateEditorWithContent(parsed);
+            }
+        } catch (err) {
+            // not JSON -> ignore
+        }
+
+        // 4) Load main images from bucket `${docId}/main_imgs/`
+        // We list files under `${docId}/main_imgs` to find stored images.
+        const mainFolder = `${docId}/main_imgs`;
+        const mainFiles = await listBucketFiles(mainFolder);
+        if (mainimagesContainer) {
+            mainimagesContainer.innerHTML = "";
+            for (const file of mainFiles) {
+                try {
+                    // Construct path and fetch public URL
+                    const filePath = `${mainFolder}/${file.name}`;
+                    const publicUrl = getPublicUrlForPath(filePath);
+                    if (!publicUrl) continue;
+                    const img = document.createElement("img");
+                    img.src = publicUrl;
+                    img.classList.add("main-image");
+                    img.dataset.src = publicUrl;
+                    attachMainImageBehavior(img);
+                    mainimagesContainer.appendChild(img);
+                } catch (err) {
+                    console.warn("Failed to append main image from bucket:", err);
+                }
+            }
+        }
+
+        // 5) Load organelles text row
+        const { data: orgRow, error: orgErr } = await supabase
+            .from('organelles')
+            .select('*')
+            .eq('document_id', docId)
+            .maybeSingle();
+
+        if (orgErr) {
+            console.warn('Failed to fetch organelles row:', orgErr);
+        }
+
+        // If organelles row exists, set dataset.content for each organelle element
+        if (orgRow) {
+            for (const domId in ORGANELLE_COLUMN_MAP) {
+                const colName = ORGANELLE_COLUMN_MAP[domId];
+                const el = document.getElementById(domId);
+                if (!el) continue;
+                const val = orgRow[colName] ?? "";
+                el.dataset.content = val;
+            }
+
+            // Now for each organelle also list images in `${docId}/{folderName}/` and set dataset.image to JSON array of public urls
+            for (const domId in ORGANELLE_COLUMN_MAP) {
+                const el = document.getElementById(domId);
+                if (!el) continue;
+                const folderName = organelleFolderName(domId);
+                const folderPath = `${docId}/${folderName}`;
+                const files = await listBucketFiles(folderPath);
+                const urls = [];
+                for (const file of files) {
+                    try {
+                        const p = `${folderPath}/${file.name}`;
+                        const publicUrl = getPublicUrlForPath(p);
+                        if (publicUrl) urls.push(publicUrl);
+                    } catch (err) {
+                        console.warn(`Failed to get public URL for ${file.name}:`, err);
+                    }
+                }
+                // set dataset.image to the array of urls (this is what other code expects)
+                el.dataset.image = JSON.stringify(urls);
+            }
+        } else {
+            // If no organelles row exists, leave current dataset.content/dataset.image as-is (maybe they were set locally)
+        }
+
+        // Finally, if popup was open or DOM expects images to have handlers, attach behavior to any images we added
+        document.querySelectorAll('.main-image').forEach(attachMainImageBehavior);
+        document.querySelectorAll('.pop-up-image').forEach(attachPopupImageBehavior);
 
     } catch (err) {
         console.error("Failed to load document:", err);
@@ -664,7 +1086,6 @@ setupOrganelName(lisosomas, "Lisosomas");
 setupOrganelName(aparatodegolgi, "Aparato de Golgi");
 
 //serviceworker//
-
 if ("serviceWorker" in navigator) {
     navigator.serviceWorker.getRegistrations().then((registrations) => {
         for (let registration of registrations) {
@@ -686,6 +1107,5 @@ if (switchviewbtn) {
         }
         const viewerUrl = `https://mentorigroup.com/MentoriCelulaAnimal/Viewer/view.html?id=${docId}`;
         window.open(viewerUrl, "_blank"); // opens in new tab
-        // Or use window.location.href = viewerUrl; if you want to replace instead of opening
     });
 }

@@ -5,4 +5,9 @@ export const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJ
 
 export const IMGS_BUCKET = "CelulaAnimalImgs";
 
+console.log("Supabase URL:", supabaseUrl);
+console.log("Supabase key:", supabaseAnonKey);
+console.log("Types:", typeof supabaseUrl, typeof supabaseAnonKey);
+
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);

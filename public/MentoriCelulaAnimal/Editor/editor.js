@@ -1006,10 +1006,11 @@ window.addEventListener('DOMContentLoaded', async () => {
         document.querySelectorAll('.pop-up-image').forEach(attachPopupImageBehavior);
 
     } catch (err) {
-        console.error("Failed to load document:", err);
-        alert("Ha ocurrido un error cargando el documento, redirigiendote a la versión de vista...");
-        window.location.href = `../Viewer/view.html?id=${docId}`;
+        console.error("❌ Failed to load document, full error details:", err);
+        alert(`Error: ${err.message}`);
+        debugger; // Pause script so we can inspect in DevTools
     }
+
 });
 
 //---------------------

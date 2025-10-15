@@ -743,21 +743,7 @@ if (saveonlinebutton) {
     });
 }
 
-/**
- * Upload all images present in the editor (main images + organelle images) to the bucket
- * under folders named after documentId.
- *
- * Behavior:
- * - For each main image element src:
- *    - if src startsWith('data:') -> convert to Blob and upload
- *    - else if src looks like already uploaded to our bucket -> skip or keep as-is
- *    - else attempt to fetch and upload (best-effort)
- *
- * - For each organelle: process its dataset.image (JSON array of src strings) similarly and upload to
- *  : `${documentId}/{organelFolder}/img{index}.{ext}`
- *
- * This function returns an object with public URLs if needed, but we don't strictly require it.
- */
+//ImageBlob
 async function uploadAllImagesForDocument(documentId, editorContent) {
     if (!documentId) throw new Error("uploadAllImagesForDocument requires a documentId");
 
@@ -835,6 +821,38 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
 
     // Return optionally a summary of the uploaded assets (not used by caller right now)
     return true;
+    // -----------------------------
+// Upload a blob to Supabase Storage and return its public URL
+// -----------------------------
+    async function uploadBlobToBucket(blob, path) {
+        try {
+            // Make sure the user is authenticated
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            if (userError) throw userError;
+            if (!user) throw new Error("You must be logged in to upload images.");
+
+            // Upload the blob (Supabase automatically assigns owner_id = user.id)
+            const { data, error } = await supabase.storage
+                .from(IMGS_BUCKET)
+                .upload(path, blob, {
+                    cacheControl: "3600",
+                    upsert: true,
+                });
+
+            if (error) throw error;
+
+            // Get the public URL for this uploaded file
+            const { data: publicData } = supabase.storage
+                .from(IMGS_BUCKET)
+                .getPublicUrl(path);
+
+            return publicData?.publicUrl ?? null;
+        } catch (err) {
+            console.error("❌ uploadBlobToBucket error:", err.message);
+            throw err;
+        }
+    }
+
 }
 
 /**

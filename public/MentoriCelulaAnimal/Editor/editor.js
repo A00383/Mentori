@@ -585,32 +585,31 @@ async function loadDocumentById(id) {
  */
 
 async function uploadBlobToBucket(bucketName, path, blob) {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError) throw userError;
-    if (!user) throw new Error("User not logged in");
+    const user = await supabase.auth.getUser();
+    const ownerId = user?.data?.user?.id; // ✅ this is a UUID
 
-    console.log(`🪣 Uploading ${bucketName}/${path} for user ${user.id}`);
+    if (!ownerId) {
+        console.error("❌ No valid owner UUID found");
+        return;
+    }
+
+    console.log("🪣 Uploading", path, "for user", ownerId);
 
     const { data, error } = await supabase.storage
         .from(bucketName)
         .upload(path, blob, {
             upsert: true,
-            metadata: {
-                uploaded_by: user.id,          // ✅ UUID, valid
-                uploaded_at: new Date().toISOString(),
-                // If you want to attach your documentId safely:
-                document_id: path.split('/')[0] // stores as string, not UUID
-            }
+            // ⚠️ Important: do NOT manually pass documentId as owner or owner_id
+            // Supabase fills these automatically based on your auth context
         });
 
-    if (error) throw error;
+    if (error) {
+        console.error("⚠️ Failed to upload:", error);
+    } else {
+        console.log("✅ Uploaded:", data);
+    }
 
-    const { data: publicData } = supabase.storage
-        .from(bucketName)
-        .getPublicUrl(path);
-
-    console.log("✅ Uploaded URL:", publicData.publicUrl);
-    return publicData.publicUrl;
+    return data;
 }
 
 

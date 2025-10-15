@@ -791,43 +791,6 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
 
     // Return success indicator
     return true;
-
-
-    // -----------------------------
-// Upload a blob to Supabase Storage and return its public URL
-// -----------------------------
-    async function uploadBlobToBucket(blob, path) {
-        try {
-            // Ensure user is authenticated
-            const {data: {user}, error: userError} = await supabase.auth.getUser();
-            if (userError) throw userError;
-            if (!user) throw new Error("You must be logged in to upload images.");
-
-            // ✅ Normalize the path to avoid invalid UUID folder issues
-            // Replace any non-UUID-safe characters in the documentId portion
-            const safePath = path.replace(/[^a-zA-Z0-9/_\-\.]/g, "_");
-
-            // Upload blob to bucket
-            const {data, error} = await supabase.storage
-                .from(IMGS_BUCKET)
-                .upload(safePath, blob, {
-                    cacheControl: "3600",
-                    upsert: true,
-                });
-
-            if (error) throw error;
-
-            // Retrieve public URL
-            const {data: publicData} = supabase.storage
-                .from(IMGS_BUCKET)
-                .getPublicUrl(safePath);
-
-            return publicData?.publicUrl ?? null;
-        } catch (err) {
-            console.error("❌ uploadBlobToBucket error:", err.message);
-            throw err;
-        }
-    }
 }
 
 

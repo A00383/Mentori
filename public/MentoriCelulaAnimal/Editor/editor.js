@@ -9,6 +9,18 @@
 import { supabase, IMGS_BUCKET } from "../../supabase.js";
 import { nanoid } from 'https://cdn.jsdelivr.net/npm/nanoid/nanoid.js';
 
+
+async function getCurrentUser() {
+    try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error) throw error;
+        return user;
+    } catch (err) {
+        console.error("getCurrentUser error:", err);
+        return null;
+    }
+}
+
 // -----------------------------
 // DOM Elements (defensive lookups)
 // -----------------------------

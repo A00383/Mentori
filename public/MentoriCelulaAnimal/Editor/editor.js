@@ -557,6 +557,50 @@ async function loadDocumentById(id) {
     return data;
 }
 
+async function clearDocumentImages(documentId) {
+    console.log(`🧹 Clearing images for document ${documentId}...`);
+
+    // List everything under this document folder
+    const { data: files, error } = await supabase.storage
+        .from(IMGS_BUCKET)
+        .list(documentId, { limit: 1000 });
+
+    if (error) {
+        console.warn("⚠️ Could not list document images:", error.message);
+        return;
+    }
+
+    if (!files || files.length === 0) return;
+
+    // Collect all file paths (include subfolders)
+    const filePaths = [];
+    for (const f of files) {
+        if (f.name.includes(".")) {
+            // file directly under /documentId
+            filePaths.push(`${documentId}/${f.name}`);
+        } else {
+            // it's a folder, recurse
+            const { data: subFiles } = await supabase.storage
+                .from(IMGS_BUCKET)
+                .list(`${documentId}/${f.name}`);
+            subFiles?.forEach(sf =>
+                filePaths.push(`${documentId}/${f.name}/${sf.name}`)
+            );
+        }
+    }
+
+    if (filePaths.length > 0) {
+        const { error: delError } = await supabase.storage
+            .from(IMGS_BUCKET)
+            .remove(filePaths);
+        if (delError)
+            console.warn("⚠️ Failed to delete old document images:", delError.message);
+        else
+            console.log(`🧹 Deleted ${filePaths.length} old images.`);
+    }
+}
+
+
 // -----------------------------
 // Storage Helpers
 // -----------------------------
@@ -700,7 +744,10 @@ if (saveonlinebutton) {
 // Upload all images for a document
 // -----------------------------
 async function uploadAllImagesForDocument(documentId, editorContent) {
+
     if (!documentId) throw new Error("uploadAllImagesForDocument requires a documentId");
+
+    await clearDocumentImages(documentId);
 
     // --- MAIN IMAGES ---
     const mainImgs = [...(mainimagesContainer?.querySelectorAll("img") || [])];

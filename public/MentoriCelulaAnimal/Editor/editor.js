@@ -584,25 +584,27 @@ async function loadDocumentById(id) {
  * Returns the public URL string.
  */
 
-async function uploadBlobToBucket(documentId, organelleName, blob) {
-    // ✅ Ensure we’re using the main client (already authenticated)
+async function uploadBlobToBucket(bucketName, path, blob) {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError) throw userError;
     if (!user) throw new Error("User not logged in");
 
-    // ✅ Define path inside the bucket: "documentId/organelleName.png"
-    const path = `${documentId}/${organelleName}.png`;
+    console.log(`🪣 Uploading ${bucketName}/${path} for user ${user.id}`);
 
-    console.log(`🪣 Uploading ${path} for user ${user.id}`);
-
-    // ✅ Upload blob to Supabase Storage
     const { data, error } = await supabase.storage
-        .from(IMGS_BUCKET)
+        .from(bucketName)
         .upload(path, blob, { upsert: true });
 
     if (error) throw error;
-    return data;
+
+    const { data: publicData } = supabase.storage
+        .from(bucketName)
+        .getPublicUrl(path);
+
+    console.log("✅ Uploaded URL:", publicData.publicUrl);
+    return publicData.publicUrl;
 }
+
 
 
 

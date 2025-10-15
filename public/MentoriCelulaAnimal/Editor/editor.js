@@ -678,6 +678,66 @@ function extensionFromMime(mime) {
     return ext === "jpeg" ? "jpg" : ext || "png";
 }
 
+//----------------------
+//Copy Document Helper
+//----------------------
+
+async function copyDocumentImages(oldId, newId) {
+    console.log(`📦 Copying images from ${oldId} → ${newId}`);
+
+    const { data: files, error } = await supabase.storage
+        .from(IMGS_BUCKET)
+        .list(oldId, { limit: 1000 });
+
+    if (error) {
+        console.warn("⚠️ Failed to list source folder:", error.message);
+        return;
+    }
+
+    for (const f of files) {
+        if (f.name.includes(".")) {
+            // File directly under /oldId
+            await copyFile(`${oldId}/${f.name}`, `${newId}/${f.name}`);
+        } else {
+            // Folder — recurse
+            const { data: subFiles } = await supabase.storage
+                .from(IMGS_BUCKET)
+                .list(`${oldId}/${f.name}`);
+
+            for (const sf of subFiles) {
+                await copyFile(
+                    `${oldId}/${f.name}/${sf.name}`,
+                    `${newId}/${f.name}/${sf.name}`
+                );
+            }
+        }
+    }
+
+    console.log(`✅ Finished copying images for ${newId}`);
+}
+
+async function copyFile(srcPath, destPath) {
+    const { data, error } = await supabase.storage
+        .from(IMGS_BUCKET)
+        .download(srcPath);
+
+    if (error) {
+        console.warn("⚠️ Failed to download file:", srcPath, error.message);
+        return;
+    }
+
+    const blob = data;
+    const { error: uploadError } = await supabase.storage
+        .from(IMGS_BUCKET)
+        .upload(destPath, blob, { upsert: true });
+
+    if (uploadError) {
+        console.warn("⚠️ Failed to upload file:", destPath, uploadError.message);
+    } else {
+        console.log(`📁 Copied ${srcPath} → ${destPath}`);
+    }
+}
+
 
 // -----------------------------
 // Copy Button
@@ -692,10 +752,18 @@ if (copyBtn) {
             return;
         }
 
+        const oldId = new URLSearchParams(window.location.search).get("id");
+
         try {
             const newId = await createDocument(content);
-            await uploadAllImagesForDocument(newId, content);
+
+            // 🧩 Copy all images
+            await copyDocumentImages(oldId, newId);
+
+            // 🧠 Copy organelle text and metadata
             await upsertOrganellesText(newId, content);
+
+            // Open new document
             window.open(`/MentoriCelulaAnimal/Editor/editor.html?id=${newId}`, "_blank");
         } catch (err) {
             console.error(err);

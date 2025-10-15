@@ -60,7 +60,6 @@ let mainimageremoveMode = false;
 // -----------------------------
 // Configuration
 // -----------------------------
-const IMGS_BUCKET = "CelulaAnimalImgs";
 const BUCKET_ROOT_FOLDER = ""; // root within bucket; kept blank so we upload as `${docId}/...`
 const SUPABASE_PUBLIC_BASE = ""; // not used directly; we use getPublicUrl per file
 

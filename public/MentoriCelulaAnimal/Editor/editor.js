@@ -716,8 +716,12 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
             const path = `${documentId}/${filename}`; // ✅ safe string path
 
             const publicUrl = await uploadBlobToBucket(IMGS_BUCKET, path, blob);
+
+            await new Promise(res => setTimeout(res, 300));
+
             mainImgs[i].src = publicUrl;
             mainImgs[i].dataset.src = publicUrl;
+
         } catch (err) {
             console.warn("⚠️ Failed to upload main image:", err);
         }
@@ -751,6 +755,7 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
                 const path = `${documentId}/${filename}`; // ✅ safe path
 
                 const publicUrl = await uploadBlobToBucket(IMGS_BUCKET, path, blob);
+                await new Promise(res => setTimeout(res, 300));
                 newUrls.push(publicUrl);
             } catch (err) {
                 console.warn(`⚠️ Failed to upload image for organelle ${folderName}:`, err);
@@ -859,7 +864,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         }
 
         // Load main images
-        const mainFolder = `docs/${docId}/main_imgs`;
+        const mainFolder = `${docId}/main_imgs`;
         const mainFiles = await listBucketFiles(mainFolder);
         if (mainimagesContainer) {
             mainimagesContainer.innerHTML = "";
@@ -894,7 +899,7 @@ window.addEventListener("DOMContentLoaded", async () => {
                 const el = document.getElementById(domId);
                 if (!el) continue;
                 const folderName = organelleFolderName(domId);
-                const folderPath = `docs/${docId}/${folderName}`;
+                const folderPath = `${docId}/${folderName}`;
                 const files = await listBucketFiles(folderPath);
                 const urls = files.map(f => getPublicUrlForPath(`${folderPath}/${f.name}`)).filter(Boolean);
                 el.dataset.image = JSON.stringify(urls);

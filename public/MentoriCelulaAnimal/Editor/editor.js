@@ -576,10 +576,16 @@ async function uploadBlobToBucket(bucketName, path, blob) {
 
     console.log(`🪣 Uploading ${bucketName}/${path} for user ${user.id}`);
 
-    // Directly use the main client
     const { data, error } = await supabase.storage
         .from(bucketName)
-        .upload(path, blob, { upsert: true });
+        .upload(path, blob, {
+            upsert: true,
+            metadata: {
+                owner_id: user.id,  // ✅ this prevents the UUID type error
+                uploaded_by: user.email,
+                document_ref: path.split("/")[1], // optional, for debugging
+            },
+        });
 
     if (error) throw error;
 
@@ -590,6 +596,7 @@ async function uploadBlobToBucket(bucketName, path, blob) {
     console.log("✅ Uploaded URL:", publicData.publicUrl);
     return publicData.publicUrl;
 }
+
 
 
 /**

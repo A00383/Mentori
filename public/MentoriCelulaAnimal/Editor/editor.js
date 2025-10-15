@@ -6,15 +6,7 @@
 // Top-level imports (must be at top)
 // -----------------------------
 
-import { supabase } from '../../supabase.js';
 import { supabase, IMGS_BUCKET } from "../../supabase.js";
-import {
-    uploadBlobToBucket,
-    listBucketFiles,
-    getPublicUrlForPath,
-    getBlobFromSrc,
-    extensionFromMime,
-} from "../Supabase/storage-helpers.js";
 import { nanoid } from 'https://cdn.jsdelivr.net/npm/nanoid/nanoid.js';
 
 // -----------------------------

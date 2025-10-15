@@ -505,7 +505,7 @@ async function getUserSupabaseClient() {
     if (error) throw error;
     if (!session) throw new Error("User not logged in");
 
-    return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    return createClient(supabaseUrl, supabaseAnonKey, {
         global: {
             headers: { Authorization: `Bearer ${session.access_token}` },
         },
@@ -569,37 +569,24 @@ async function loadDocumentById(id) {
  */
 
 async function uploadBlobToBucket(bucketName, filePath, blob) {
-    console.log(`📤 Uploading to ${bucketName}/${filePath}...`);
+    const userSupabase = await getUserSupabaseClient();
 
-    // ✅ Ensure user is logged in
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError) throw userError;
-    if (!user) throw new Error("User not logged in.");
-
-    // ✅ Upload file — Supabase automatically uses the authenticated user's UUID
-    const { data, error } = await supabase.storage
+    const { data, error } = await userSupabase.storage
         .from(bucketName)
         .upload(filePath, blob, {
             upsert: true,
             contentType: blob.type || "image/png",
         });
 
-    if (error) {
-        console.error("❌ uploadBlobToBucket upload error:", error.message);
-        throw error;
-    }
+    if (error) throw error;
 
-    console.log("✅ Uploaded:", data);
-
-    // ✅ Get public URL
-    const { data: publicData, error: publicErr } = await supabase.storage
+    const { data: publicData } = await userSupabase.storage
         .from(bucketName)
         .getPublicUrl(filePath);
 
-    if (publicErr) throw publicErr;
-
     return publicData?.publicUrl || null;
 }
+
 
 
 /**

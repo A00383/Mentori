@@ -516,10 +516,17 @@ async function getUserSupabaseClient() {
     if (error) throw error;
     if (!session) throw new Error("User not logged in");
 
-    // ✅ just return the already initialized supabase client
-    return supabase;
+    // ✅ Use the current supabase URL/key, not the documentId
+    return createClient(
+        supabase.supabaseUrl,
+        supabase.supabaseKey,
+        {
+            global: {
+                headers: { Authorization: `Bearer ${session.access_token}` },
+            },
+        }
+    );
 }
-
 
 // createDocument now expects an editorContent object (the same object returned by gatherEditorContent),
 // but only stores description into documents.content (per your requirements).

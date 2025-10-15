@@ -576,17 +576,19 @@ async function uploadBlobToBucket(bucketName, path, blob) {
 
     console.log(`🪣 Uploading ${bucketName}/${path} for user ${user.id}`);
 
+    // ✅ Upload the file — no invalid metadata fields
     const { data, error } = await supabase.storage
         .from(bucketName)
         .upload(path, blob, {
-            upsert: true,
+            upsert: true, // overwrite if same filename
             metadata: {
-                uploaded_by: user.email, // optional, purely text
+                uploaded_by: user.email // optional, safe string
             },
         });
 
     if (error) throw error;
 
+    // ✅ Get public URL
     const { data: publicData } = supabase.storage
         .from(bucketName)
         .getPublicUrl(path);
@@ -594,7 +596,6 @@ async function uploadBlobToBucket(bucketName, path, blob) {
     console.log("✅ Uploaded URL:", publicData.publicUrl);
     return publicData.publicUrl;
 }
-
 
 
 /**

@@ -581,9 +581,7 @@ async function uploadBlobToBucket(bucketName, path, blob) {
         .upload(path, blob, {
             upsert: true,
             metadata: {
-                owner_id: user.id,  // ✅ this prevents the UUID type error
-                uploaded_by: user.email,
-                document_ref: path.split("/")[1], // optional, for debugging
+                uploaded_by: user.email, // optional, purely text
             },
         });
 

@@ -904,7 +904,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         const user = await getCurrentUser();
 
-        if (!user || user.email !== doc.creator) {
+        if (!user || user.id !== doc.owner_id) {
             alert("No tienes la autorización para editar este documento, enviandote a la versión de vista...");
             window.location.href = `../Viewer/view.html?id=${docId}`;
             return;

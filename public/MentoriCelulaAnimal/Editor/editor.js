@@ -826,18 +826,6 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
 }
 
 
-        // Update dataset.image for the organelle
-        try {
-            organel.dataset.image = JSON.stringify(newUrls);
-        } catch {
-        }
-    }
-
-    // Return success indicator
-    return true;
-}
-
-
     /**
  * Upsert organelle textual contents into the organelles table for the given documentId.
  * The organelles table has one row per document (id) and many columns (one per organelle).

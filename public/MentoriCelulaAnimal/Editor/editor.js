@@ -560,13 +560,22 @@ async function loadDocumentById(id) {
 async function uploadBlobToBucket(blobOrFile, path) {
     if (!blobOrFile) throw new Error('No file/blob provided to uploadBlobToBucket');
 
-    // ✅ Ensure the user is signed in — Storage requires a valid UUID owner_id
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError) throw userError;
-    if (!userData?.user) throw new Error("You must be logged in to upload files.");
+    // ✅ Get current session to obtain access token
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+    if (!session) throw new Error("You must be logged in to upload files.");
 
-    // ✅ Upload (Supabase automatically assigns owner_id = user.id)
-    const { data, error } = await supabase.storage
+    // ✅ Create a user-authenticated Supabase client (uses user’s access token)
+    const userSupabase = window.createClient
+        ? window.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            global: {
+                headers: { Authorization: `Bearer ${session.access_token}` },
+            },
+        })
+        : supabase; // fallback if createClient is already available
+
+    // ✅ Upload using the authenticated client
+    const { data, error } = await userSupabase.storage
         .from(IMGS_BUCKET)
         .upload(path, blobOrFile, { upsert: true });
 
@@ -576,15 +585,15 @@ async function uploadBlobToBucket(blobOrFile, path) {
     }
 
     // ✅ Get the public URL
-    const { data: publicData, error: publicErr } = await supabase.storage
+    const { data: publicData, error: publicErr } = await userSupabase.storage
         .from(IMGS_BUCKET)
         .getPublicUrl(path);
 
     if (publicErr) throw publicErr;
 
-    const publicUrl = publicData?.publicUrl || publicData?.public_url || null;
-    return publicUrl;
+    return publicData?.publicUrl || null;
 }
+
 
 /**
  * List all files inside a Supabase Storage folder.

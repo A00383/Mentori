@@ -809,7 +809,8 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
         // Update dataset.image for the organelle
         try {
             organel.dataset.image = JSON.stringify(newUrls);
-        } catch {}
+        } catch {
+        }
     }
 
     // Return success indicator
@@ -822,7 +823,7 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
     async function uploadBlobToBucket(blob, path) {
         try {
             // Ensure user is authenticated
-            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            const {data: {user}, error: userError} = await supabase.auth.getUser();
             if (userError) throw userError;
             if (!user) throw new Error("You must be logged in to upload images.");
 
@@ -831,7 +832,7 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
             const safePath = path.replace(/[^a-zA-Z0-9/_\-\.]/g, "_");
 
             // Upload blob to bucket
-            const { data, error } = await supabase.storage
+            const {data, error} = await supabase.storage
                 .from(IMGS_BUCKET)
                 .upload(safePath, blob, {
                     cacheControl: "3600",
@@ -841,7 +842,7 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
             if (error) throw error;
 
             // Retrieve public URL
-            const { data: publicData } = supabase.storage
+            const {data: publicData} = supabase.storage
                 .from(IMGS_BUCKET)
                 .getPublicUrl(safePath);
 
@@ -851,7 +852,7 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
             throw err;
         }
     }
-
+}
 
 
     /**

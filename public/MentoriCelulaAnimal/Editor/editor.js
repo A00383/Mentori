@@ -510,19 +510,17 @@ if (savebtn) {
 // -----------------------------
 // Supabase Online Save & Load helpers
 // -----------------------------
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { supabase } from "../../supabase.js";
 
 async function getUserSupabaseClient() {
     const { data: { session }, error } = await supabase.auth.getSession();
     if (error) throw error;
     if (!session) throw new Error("User not logged in");
 
-    return createClient(supabase, {
-        global: {
-            headers: { Authorization: `Bearer ${session.access_token}` },
-        },
-    });
+    // ✅ just return the already initialized supabase client
+    return supabase;
 }
+
 
 // createDocument now expects an editorContent object (the same object returned by gatherEditorContent),
 // but only stores description into documents.content (per your requirements).

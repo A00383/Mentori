@@ -557,22 +557,33 @@ async function loadDocumentById(id) {
  * Upload a Blob/File to Supabase storage, path is like `${docId}/main_imgs/img0.png`.
  * Returns public URL string.
  */
+/**
+ * Upload a Blob/File to Supabase storage, path like `${docId}/main_imgs/img0.png`.
+ * Returns the public URL string.
+ */
 async function uploadBlobToBucket(bucketName, filePath, blob) {
     console.log(`📤 Uploading to ${bucketName}/${filePath}...`);
 
-    // Ensure user is authenticated
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-        console.error("❌ No authenticated user:", userError);
-        throw new Error("User not logged in.");
-    }
+    // ✅ Get current session (contains user access token)
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+    if (!session) throw new Error("User not logged in.");
 
-    // Upload file (supabase infers user’s UUID automatically)
-    const { data, error } = await supabase.storage
+    // ✅ Create a user-authenticated Supabase client (uses user’s access token)
+    const userSupabase = window.createClient
+        ? window.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            global: {
+                headers: { Authorization: `Bearer ${session.access_token}` },
+            },
+        })
+        : supabase; // fallback if already authenticated
+
+    // ✅ Upload file (Supabase infers user UUID automatically)
+    const { data, error } = await userSupabase.storage
         .from(bucketName)
         .upload(filePath, blob, {
             upsert: true,
-            contentType: blob.type || "image/png"
+            contentType: blob.type || "image/png",
         });
 
     if (error) {
@@ -581,8 +592,17 @@ async function uploadBlobToBucket(bucketName, filePath, blob) {
     }
 
     console.log("✅ Uploaded:", data);
-    return data;
+
+    // ✅ Return public URL
+    const { data: publicData, error: publicErr } = await userSupabase.storage
+        .from(bucketName)
+        .getPublicUrl(filePath);
+
+    if (publicErr) throw publicErr;
+
+    return publicData?.publicUrl || null;
 }
+
 
 
 

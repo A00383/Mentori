@@ -550,6 +550,9 @@ async function loadDocumentById(id) {
 // -----------------------------
 // Storage helpers (uploading / listing / getting public URLs)
 // -----------------------------
+// -----------------------------
+// Storage helpers (uploading / listing / getting public URLs)
+// -----------------------------
 /**
  * Upload a Blob/File to Supabase storage, path is like `${docId}/main_imgs/img0.png`.
  * Returns public URL string.
@@ -584,6 +587,30 @@ async function uploadBlobToBucket(blobOrFile, path) {
 }
 
 /**
+ * List all files inside a Supabase Storage folder.
+ * Returns an array of file objects (each with .name, .id, etc.).
+ */
+export async function listBucketFiles(path) {
+    const { data, error } = await supabase.storage.from(IMGS_BUCKET).list(path, {
+        limit: 100,
+        offset: 0,
+    });
+    if (error) {
+        console.warn("⚠️ listBucketFiles error:", error.message);
+        return [];
+    }
+    return data || [];
+}
+
+/**
+ * Get the public URL for a file in the bucket.
+ */
+export function getPublicUrlForPath(path) {
+    const { data } = supabase.storage.from(IMGS_BUCKET).getPublicUrl(path);
+    return data?.publicUrl ?? null;
+}
+
+/**
  * Convert a dataURL (data:...base64,...) into a Blob.
  */
 function dataURLToBlob(dataURL) {
@@ -600,6 +627,7 @@ function dataURLToBlob(dataURL) {
     }
     return new Blob([intArray], { type: contentType });
 }
+
 
 /**
  * Given an image src, try to produce a Blob:

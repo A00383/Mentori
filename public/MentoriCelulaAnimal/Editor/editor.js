@@ -561,25 +561,18 @@ async function loadDocumentById(id) {
  * Upload a Blob/File to Supabase storage, path like `${docId}/main_imgs/img0.png`.
  * Returns the public URL string.
  */
+import { supabase } from "../../supabase.js"; // or your correct path
+
 async function uploadBlobToBucket(bucketName, filePath, blob) {
     console.log(`📤 Uploading to ${bucketName}/${filePath}...`);
 
-    // ✅ Get current session (contains user access token)
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError) throw sessionError;
-    if (!session) throw new Error("User not logged in.");
+    // ✅ Ensure user is logged in
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError) throw userError;
+    if (!user) throw new Error("User not logged in.");
 
-    // ✅ Create a user-authenticated Supabase client (uses user’s access token)
-    const userSupabase = window.createClient
-        ? window.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-            global: {
-                headers: { Authorization: `Bearer ${session.access_token}` },
-            },
-        })
-        : supabase; // fallback if already authenticated
-
-    // ✅ Upload file (Supabase infers user UUID automatically)
-    const { data, error } = await userSupabase.storage
+    // ✅ Upload file — Supabase automatically uses the authenticated user's UUID
+    const { data, error } = await supabase.storage
         .from(bucketName)
         .upload(filePath, blob, {
             upsert: true,
@@ -593,8 +586,8 @@ async function uploadBlobToBucket(bucketName, filePath, blob) {
 
     console.log("✅ Uploaded:", data);
 
-    // ✅ Return public URL
-    const { data: publicData, error: publicErr } = await userSupabase.storage
+    // ✅ Get public URL
+    const { data: publicData, error: publicErr } = await supabase.storage
         .from(bucketName)
         .getPublicUrl(filePath);
 
@@ -602,6 +595,7 @@ async function uploadBlobToBucket(bucketName, filePath, blob) {
 
     return publicData?.publicUrl || null;
 }
+
 
 
 

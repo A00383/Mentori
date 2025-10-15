@@ -1,7 +1,7 @@
 // -----------------------------
 // --- Handle Supabase OAuth hash ---
 // -----------------------------
-import { supabase } from '/supabase.js';
+import { supabase } from '../../supabase.js';
 
 (async () => {
     if (window.location.hash.includes("access_token")) {

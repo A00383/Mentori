@@ -756,7 +756,6 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
     for (let i = 0; i < mainImgs.length; i++) {
         const src = mainImgs[i].src;
         try {
-            // ✅ Skip already uploaded images
             if (
                 src &&
                 src.startsWith("http") &&
@@ -770,12 +769,10 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
 
             const ext = extensionFromMime(blob.type || "image/png");
             const filename = `main_imgs/img_${i}_${crypto.randomUUID()}.${ext}`;
-            const path = `docs/${documentId}/${filename}`;
+            const path = `${documentId}/${filename}`;
 
-            // ✅ Correct argument order (bucketName, path, blob)
             const publicUrl = await uploadBlobToBucket(IMGS_BUCKET, path, blob);
 
-            // ✅ Update <img> src to point to Supabase URL
             mainImgs[i].src = publicUrl;
             mainImgs[i].dataset.src = publicUrl;
         } catch (err) {
@@ -814,7 +811,7 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
 
                 const ext = extensionFromMime(blob.type || "image/png");
                 const filename = `${folderName}/img_${i}_${crypto.randomUUID()}.${ext}`;
-                const path = `docs/${documentId}/${filename}`;
+                const path = `${documentId}/${filename}`;
 
                 const publicUrl = await uploadBlobToBucket(IMGS_BUCKET, path, blob);
                 newUrls.push(publicUrl);
@@ -824,7 +821,6 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
             }
         }
 
-        // ✅ Update organelle image data
         organel.dataset.image = JSON.stringify(newUrls);
     }
 

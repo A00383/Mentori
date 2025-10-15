@@ -561,7 +561,6 @@ async function loadDocumentById(id) {
  * Upload a Blob/File to Supabase storage, path like `${docId}/main_imgs/img0.png`.
  * Returns the public URL string.
  */
-import { supabase } from "../../supabase.js"; // or your correct path
 
 async function uploadBlobToBucket(bucketName, filePath, blob) {
     console.log(`📤 Uploading to ${bucketName}/${filePath}...`);

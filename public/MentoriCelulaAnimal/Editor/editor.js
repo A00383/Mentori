@@ -7,7 +7,6 @@
 // -----------------------------
 
 import { supabase, IMGS_BUCKET } from "../../supabase.js";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { nanoid } from 'https://cdn.jsdelivr.net/npm/nanoid/nanoid.js';
 
 
@@ -571,34 +570,27 @@ async function loadDocumentById(id) {
  */
 
 async function uploadBlobToBucket(bucketName, path, blob) {
-    const userClient = await getUserSupabaseClient();
-
-    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError) throw userError;
     if (!user) throw new Error("User not logged in");
 
     console.log(`🪣 Uploading ${bucketName}/${path} for user ${user.id}`);
 
-    const { data, error } = await userClient.storage
+    // Directly use the main client
+    const { data, error } = await supabase.storage
         .from(bucketName)
-        .upload(path, blob, {
-            upsert: true,
-            metadata: {
-                uploaded_by: user.id,
-                uploaded_at: new Date().toISOString(),
-                document_id: path.split("/")[0],
-            },
-        });
+        .upload(path, blob, { upsert: true });
 
     if (error) throw error;
 
-    const { data: publicData } = userClient.storage
+    const { data: publicData } = supabase.storage
         .from(bucketName)
         .getPublicUrl(path);
 
     console.log("✅ Uploaded URL:", publicData.publicUrl);
     return publicData.publicUrl;
 }
+
 
 /**
  * List all files inside a Supabase Storage folder.

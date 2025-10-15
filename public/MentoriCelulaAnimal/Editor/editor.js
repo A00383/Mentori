@@ -743,7 +743,9 @@ if (saveonlinebutton) {
     });
 }
 
-//ImageBlob
+// ----------------------------------------------------------
+// Upload all images for a given document and its organelles
+// ----------------------------------------------------------
 async function uploadAllImagesForDocument(documentId, editorContent) {
     if (!documentId) throw new Error("uploadAllImagesForDocument requires a documentId");
 
@@ -752,52 +754,46 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
     for (let i = 0; i < mainImgs.length; i++) {
         const src = mainImgs[i].src;
         try {
-            // If src is already a public URL pointing to our bucket, skip reupload
+            // Skip if already uploaded
             if (src && src.startsWith('http') && src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
-                // already in bucket and public; skip
                 continue;
             }
 
-            // Get a blob from the src (data URL or remote fetch)
             const blob = await getBlobFromSrc(src);
             const ext = extensionFromMime(blob.type);
-            // Build deterministic filename - timestamp + index to avoid clashes
             const filename = `main_imgs/img_${i}_${crypto.randomUUID()}.${ext}`;
             const path = `${documentId}/${filename}`;
 
-            // Upload and get public url
             const publicUrl = await uploadBlobToBucket(blob, path);
 
-            // Replace the <img>.src in the editor with the public URL so future saves don't re-upload unnecessarily.
+            // Update image src to point to Supabase public URL
             mainImgs[i].src = publicUrl;
             mainImgs[i].dataset.src = publicUrl;
         } catch (err) {
-            console.warn("Failed to upload main image:", err);
-            // keep going for other images
+            console.warn("⚠️ Failed to upload main image:", err);
         }
     }
 
     // --- ORGANELE IMAGES ---
     for (const organel of organelos) {
-        // parse dataset.image
         let imgs = [];
         try {
             imgs = JSON.parse(organel.dataset.image || "[]");
-        } catch (err) {
+        } catch {
             imgs = [];
         }
 
         const folderName = organelleFolderName(organel.id || organel.dataset?.organelId || 'unknown');
-
         const newUrls = [];
+
         for (let i = 0; i < imgs.length; i++) {
             const src = imgs[i];
             try {
-                // If src already points to our public bucket, keep it
                 if (src && src.startsWith('http') && src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
                     newUrls.push(src);
                     continue;
                 }
+
                 const blob = await getBlobFromSrc(src);
                 const ext = extensionFromMime(blob.type);
                 const filename = `${folderName}/img_${i}_${crypto.randomUUID()}.${ext}`;
@@ -805,33 +801,30 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
                 const publicUrl = await uploadBlobToBucket(blob, path);
                 newUrls.push(publicUrl);
             } catch (err) {
-                console.warn(`Failed to upload image for organelle ${organel.id}:`, err);
-                // fallback: keep original src in case it is still usable
+                console.warn(`⚠️ Failed to upload image for organelle ${organel.id}:`, err);
                 if (src) newUrls.push(src);
             }
         }
 
-        // After uploading all images for this organelle, update the dataset.image to the public URLs array
+        // Update dataset.image for the organelle
         try {
             organel.dataset.image = JSON.stringify(newUrls);
-        } catch (err) {
-            // ignore
-        }
+        } catch {}
     }
 
-    // Return optionally a summary of the uploaded assets (not used by caller right now)
+    // Return success indicator
     return true;
+
+
     // -----------------------------
-// Upload a blob to Supabase Storage and return its public URL
-// -----------------------------
+    // Upload a blob to Supabase Storage and return its public URL
+    // -----------------------------
     async function uploadBlobToBucket(blob, path) {
         try {
-            // Make sure the user is authenticated
             const { data: { user }, error: userError } = await supabase.auth.getUser();
             if (userError) throw userError;
             if (!user) throw new Error("You must be logged in to upload images.");
 
-            // Upload the blob (Supabase automatically assigns owner_id = user.id)
             const { data, error } = await supabase.storage
                 .from(IMGS_BUCKET)
                 .upload(path, blob, {
@@ -841,7 +834,6 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
 
             if (error) throw error;
 
-            // Get the public URL for this uploaded file
             const { data: publicData } = supabase.storage
                 .from(IMGS_BUCKET)
                 .getPublicUrl(path);
@@ -852,8 +844,8 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
             throw err;
         }
     }
-
 }
+
 
 /**
  * Upsert organelle textual contents into the organelles table for the given documentId.

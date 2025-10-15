@@ -557,42 +557,33 @@ async function loadDocumentById(id) {
  * Upload a Blob/File to Supabase storage, path is like `${docId}/main_imgs/img0.png`.
  * Returns public URL string.
  */
-async function uploadBlobToBucket(blobOrFile, path) {
-    if (!blobOrFile) throw new Error('No file/blob provided to uploadBlobToBucket');
+async function uploadBlobToBucket(bucketName, filePath, blob) {
+    console.log(`📤 Uploading to ${bucketName}/${filePath}...`);
 
-    // ✅ Get current session to obtain access token
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError) throw sessionError;
-    if (!session) throw new Error("You must be logged in to upload files.");
+    // Ensure user is authenticated
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+        console.error("❌ No authenticated user:", userError);
+        throw new Error("User not logged in.");
+    }
 
-    // ✅ Create a user-authenticated Supabase client (uses user’s access token)
-    const userSupabase = window.createClient
-        ? window.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-            global: {
-                headers: { Authorization: `Bearer ${session.access_token}` },
-            },
-        })
-        : supabase; // fallback if createClient is already available
-
-    // ✅ Upload using the authenticated client
-    const { data, error } = await userSupabase.storage
-        .from(IMGS_BUCKET)
-        .upload(path, blobOrFile, { upsert: true });
+    // Upload file (supabase infers user’s UUID automatically)
+    const { data, error } = await supabase.storage
+        .from(bucketName)
+        .upload(filePath, blob, {
+            upsert: true,
+            contentType: blob.type || "image/png"
+        });
 
     if (error) {
         console.error("❌ uploadBlobToBucket upload error:", error.message);
         throw error;
     }
 
-    // ✅ Get the public URL
-    const { data: publicData, error: publicErr } = await userSupabase.storage
-        .from(IMGS_BUCKET)
-        .getPublicUrl(path);
-
-    if (publicErr) throw publicErr;
-
-    return publicData?.publicUrl || null;
+    console.log("✅ Uploaded:", data);
+    return data;
 }
+
 
 
 /**

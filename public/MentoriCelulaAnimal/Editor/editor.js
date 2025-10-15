@@ -510,7 +510,6 @@ if (savebtn) {
 // -----------------------------
 // Supabase Online Save & Load helpers
 // -----------------------------
-import { supabase } from "../../supabase.js";
 
 async function getUserSupabaseClient() {
     const { data: { session }, error } = await supabase.auth.getSession();

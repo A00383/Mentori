@@ -6,7 +6,8 @@
     <title>Célula animal</title>
     <link rel="stylesheet" href="view.css">
     <link rel="icon" type="image/svg+xml" href="../../Assets/FaviconMentori.svg">
-    <script src="../../supabase.js"></script>
+    <script type="module" src="../../supabase.js"></script>
+    <script type="module" src="view.js"></script>
     <script type="module">
         import { nanoid } from 'https://cdn.jsdelivr.net/npm/nanoid/nanoid.js';
         window.nanoid = nanoid;
@@ -135,8 +136,5 @@
 </div>
 
 <textarea id="description" placeholder="" data-maintext="" readonly></textarea>
-
-<script type="module" src="view.js"></script>
-
 </body>
 </html>

@@ -1,4 +1,13 @@
-// Import Supabase client
+import { supabase } from "./supabase.js";
+
+async function testConnection() {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) console.error("Auth session error:", error);
+    else console.log("✅ Supabase connected, session:", data);
+}
+
+testConnection();
+
 import { supabase } from "./supabase.js";
 import { nanoid } from "https://cdn.jsdelivr.net/npm/nanoid/nanoid.js";
 

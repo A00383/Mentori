@@ -506,51 +506,51 @@ if (savebtn) {
         URL.revokeObjectURL(url);
     });
 }
-
 // -----------------------------
-// Supabase Online Save & Load helpers
+// Document creation & update
 // -----------------------------
-
-
-
-// createDocument now expects an editorContent object (the same object returned by gatherEditorContent),
-// but only stores description into documents.content (per your requirements).
 async function createDocument(editorContent) {
     const user = await getCurrentUser();
-    if (!user) throw new Error('Must be logged-in to save document');
+    if (!user) throw new Error("Must be logged-in to save document");
 
     const id = nanoid();
     const now = new Date().toISOString();
-    const { error } = await supabase.from('documents').insert({
+
+    const { error } = await supabase.from("documents").insert({
         id,
-        title: 'Untitled',
+        title: "Untitled",
         description: null,
         content: { description: editorContent?.description ?? "" },
         creator: user.email,
-        owner_id: user.id,
+        owner_id: user.id, // UUID from auth.users table ✅
         created_at: now,
-        updated_at: now
+        updated_at: now,
     });
 
     if (error) throw error;
     return id;
 }
 
-// updateDocument will update only the content (description) field on documents table
+
 async function updateDocument(id, editorContent) {
     const now = new Date().toISOString();
-    const { error } = await supabase.from('documents')
-        .update({ content: { description: editorContent?.description ?? "" }, updated_at: now })
-        .eq('id', id);
+    const { error } = await supabase
+        .from("documents")
+        .update({
+            content: { description: editorContent?.description ?? "" },
+            updated_at: now,
+        })
+        .eq("id", id);
 
     if (error) throw error;
     return true;
 }
 
 async function loadDocumentById(id) {
-    const { data, error } = await supabase.from('documents')
-        .select('*')
-        .eq('id', id)
+    const { data, error } = await supabase
+        .from("documents")
+        .select("*")
+        .eq("id", id)
         .maybeSingle();
 
     if (error) throw error;
@@ -558,17 +558,8 @@ async function loadDocumentById(id) {
 }
 
 // -----------------------------
-// Storage helpers (uploading / listing / getting public URLs)
+// Storage Helpers
 // -----------------------------
-/**
- * Upload a Blob/File to Supabase storage, path is like `${docId}/main_imgs/img0.png`.
- * Returns public URL string.
- */
-/**
- * Upload a Blob/File to Supabase storage, path like `${docId}/main_imgs/img0.png`.
- * Returns the public URL string.
- */
-
 async function uploadBlobToBucket(bucketName, path, blob) {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError) throw userError;
@@ -576,19 +567,22 @@ async function uploadBlobToBucket(bucketName, path, blob) {
 
     console.log(`🪣 Uploading ${bucketName}/${path} for user ${user.id}`);
 
-    // ✅ Upload the file — no invalid metadata fields
+    // ✅ FIXED HERE:
+    // Do NOT pass owner_id or any metadata that could trigger a UUID validation.
+    // Use only safe metadata fields.
     const { data, error } = await supabase.storage
         .from(bucketName)
         .upload(path, blob, {
-            upsert: true, // overwrite if same filename
+            upsert: true,
             metadata: {
-                uploaded_by: user.email // optional, safe string
+                uploaded_by: user.email, // ✅ safe field
+                document_ref: path.split("/")[0], // store document ID just as a string
             },
         });
 
     if (error) throw error;
 
-    // ✅ Get public URL
+    // ✅ Public URL
     const { data: publicData } = supabase.storage
         .from(bucketName)
         .getPublicUrl(path);
@@ -597,11 +591,7 @@ async function uploadBlobToBucket(bucketName, path, blob) {
     return publicData.publicUrl;
 }
 
-
-/**
- * List all files inside a Supabase Storage folder.
- * Returns an array of file objects (each with .name, .id, etc.).
- */
+// List files from folder
 export async function listBucketFiles(path) {
     const { data, error } = await supabase.storage.from(IMGS_BUCKET).list(path, {
         limit: 100,
@@ -614,64 +604,36 @@ export async function listBucketFiles(path) {
     return data || [];
 }
 
-/**
- * Get the public URL for a file in the bucket.
- */
 export function getPublicUrlForPath(path) {
     const { data } = supabase.storage.from(IMGS_BUCKET).getPublicUrl(path);
     return data?.publicUrl ?? null;
 }
 
-/**
- * Convert a dataURL (data:...base64,...) into a Blob.
- */
+// Convert dataURL → Blob
 function dataURLToBlob(dataURL) {
-    const parts = dataURL.split(',');
-    const header = parts[0];
-    const base64 = parts[1];
-    const matches = header.match(/data:(.*?);base64/);
-    const contentType = matches ? matches[1] : 'application/octet-stream';
-    const byteString = atob(base64);
-    const arrayBuffer = new ArrayBuffer(byteString.length);
-    const intArray = new Uint8Array(arrayBuffer);
-    for (let i = 0; i < byteString.length; i++) {
-        intArray[i] = byteString.charCodeAt(i);
-    }
-    return new Blob([intArray], { type: contentType });
+    const [header, base64] = dataURL.split(",");
+    const mime = header.match(/data:(.*?);base64/)?.[1] ?? "application/octet-stream";
+    const bytes = atob(base64);
+    const arrayBuffer = new ArrayBuffer(bytes.length);
+    const view = new Uint8Array(arrayBuffer);
+    for (let i = 0; i < bytes.length; i++) view[i] = bytes.charCodeAt(i);
+    return new Blob([view], { type: mime });
 }
 
-
-/**
- * Given an image src, try to produce a Blob:
- * - if src is a data URL -> convert to Blob
- * - otherwise attempt fetch(src) and return response.blob()
- */
 async function getBlobFromSrc(src) {
-    if (!src) throw new Error('No src provided to getBlobFromSrc');
-    if (src.startsWith('data:')) {
-        return dataURLToBlob(src);
-    }
-    // If it's already a public URL we could optionally skip re-uploading.
-    // But to be robust, try fetching it and returning a blob so we can re-upload into our bucket.
+    if (!src) throw new Error("No src provided to getBlobFromSrc");
+    if (src.startsWith("data:")) return dataURLToBlob(src);
     const resp = await fetch(src);
     if (!resp.ok) throw new Error(`Failed to fetch image: ${resp.status}`);
     return await resp.blob();
 }
 
-/**
- * Determine file extension from a blob.type (MIME) or fallback extension
- */
 function extensionFromMime(mime) {
-    if (!mime) return 'png';
-    const parts = mime.split('/');
-    if (parts.length === 2) {
-        const ext = parts[1].split('+')[0]; // handle image/svg+xml etc.
-        // normalize some common types
-        if (ext === 'jpeg') return 'jpg';
-        return ext;
-    }
-    return 'png';
+    if (!mime) return "png";
+    const ext = mime.split("/")[1]?.split("+")[0];
+    return ext === "jpeg" ? "jpg" : ext || "png";
 }
+
 
 // ------------------------------
 // Copy Button
@@ -751,9 +713,9 @@ if (saveonlinebutton) {
     });
 }
 
-// ----------------------------------------------------------
-// Upload all images for a given document and its organelles
-// ----------------------------------------------------------
+// -----------------------------
+// Upload all images for a document
+// -----------------------------
 async function uploadAllImagesForDocument(documentId, editorContent) {
     if (!documentId) throw new Error("uploadAllImagesForDocument requires a documentId");
 
@@ -762,23 +724,15 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
     for (let i = 0; i < mainImgs.length; i++) {
         const src = mainImgs[i].src;
         try {
-            if (
-                src &&
-                src.startsWith("http") &&
-                src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)
-            ) {
+            if (src?.startsWith("http") && src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`))
                 continue;
-            }
 
             const blob = await getBlobFromSrc(src);
-            if (!blob) throw new Error("Invalid blob for main image " + i);
-
             const ext = extensionFromMime(blob.type || "image/png");
             const filename = `main_imgs/img_${i}_${crypto.randomUUID()}.${ext}`;
-            const path = `${documentId}/${filename}`;
+            const path = `${documentId}/${filename}`; // ✅ safe string path
 
             const publicUrl = await uploadBlobToBucket(IMGS_BUCKET, path, blob);
-
             mainImgs[i].src = publicUrl;
             mainImgs[i].dataset.src = publicUrl;
         } catch (err) {
@@ -803,21 +757,15 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
         for (let i = 0; i < imgs.length; i++) {
             const src = imgs[i];
             try {
-                if (
-                    src &&
-                    src.startsWith("http") &&
-                    src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)
-                ) {
+                if (src?.startsWith("http") && src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
                     newUrls.push(src);
                     continue;
                 }
 
                 const blob = await getBlobFromSrc(src);
-                if (!blob) throw new Error(`Invalid blob for ${folderName} image ${i}`);
-
                 const ext = extensionFromMime(blob.type || "image/png");
                 const filename = `${folderName}/img_${i}_${crypto.randomUUID()}.${ext}`;
-                const path = `${documentId}/${filename}`;
+                const path = `${documentId}/${filename}`; // ✅ safe path
 
                 const publicUrl = await uploadBlobToBucket(IMGS_BUCKET, path, blob);
                 newUrls.push(publicUrl);
@@ -833,48 +781,30 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
     return true;
 }
 
-
-    /**
- * Upsert organelle textual contents into the organelles table for the given documentId.
- * The organelles table has one row per document (id) and many columns (one per organelle).
- *
- * We build a row object where:
- * - id = nanoid() or `${documentId}-org` (use deterministic id tied to document)
- * - document_id = documentId
- * - creator = current user email
- * - then set each column to organelle.dataset.content or empty string/null
- *
- * If a row already exists for this document_id we perform an upsert (update).
- */
+// -----------------------------
+// Organelles table upsert
+// -----------------------------
 async function upsertOrganellesText(documentId, editorContent) {
     const user = await getCurrentUser();
-    if (!user) throw new Error('Must be logged-in to write organelle text');
+    if (!user) throw new Error("Must be logged-in to write organelle text");
 
-    // Build payload
     const payload = {
-        id: `${documentId}-organelles`, // deterministic id so upserts are easy
+        id: `${documentId}-organelles`,
         document_id: documentId,
-        creator: user.email
+        creator: user.email,
     };
 
-    // For each organelle in ORGANELLE_COLUMN_MAP try to read its content from the DOM
     for (const domId in ORGANELLE_COLUMN_MAP) {
         const colName = ORGANELLE_COLUMN_MAP[domId];
         const el = document.getElementById(domId);
-        const content = el?.dataset?.content ?? "";
-        payload[colName] = content;
+        payload[colName] = el?.dataset?.content ?? "";
     }
 
-    // also handle any organeles that exist in the DOM but not in the mapping (defensive)
-    // we won't write them to DB but we might console.warn
     const { error } = await supabase
-        .from('organelles') // <-- make sure this matches your exact Supabase table name
-        .upsert(payload, { onConflict: 'document_id' });
+        .from("organelles")
+        .upsert(payload, { onConflict: "document_id" });
 
-    if (error) {
-        // try fallback: insert or update separately to provide clearer error
-        throw error;
-    }
+    if (error) throw error;
     return true;
 }
 

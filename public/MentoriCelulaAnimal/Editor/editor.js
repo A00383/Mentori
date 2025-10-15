@@ -770,7 +770,7 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
 
             const ext = extensionFromMime(blob.type || "image/png");
             const filename = `main_imgs/img_${i}_${crypto.randomUUID()}.${ext}`;
-            const path = `docs/${documentId}/${filename}`;
+            const path = `${documentId}/${filename}`;
 
             // ✅ Correct argument order (bucketName, path, blob)
             const publicUrl = await uploadBlobToBucket(IMGS_BUCKET, path, blob);
@@ -814,7 +814,7 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
 
                 const ext = extensionFromMime(blob.type || "image/png");
                 const filename = `${folderName}/img_${i}_${crypto.randomUUID()}.${ext}`;
-                const path = `docs/${documentId}/${filename}`;
+                const path = `${documentId}/${filename}`;
 
                 const publicUrl = await uploadBlobToBucket(IMGS_BUCKET, path, blob);
                 newUrls.push(publicUrl);

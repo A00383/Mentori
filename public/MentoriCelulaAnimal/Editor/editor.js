@@ -903,7 +903,8 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
 
         const user = await getCurrentUser();
-
+        console.log("👤 Auth user from Supabase:", user);
+        console.log("📄 Document creator from DB:", doc.creator);
         if (!user || user.id !== doc.owner_id) {
             alert("No tienes la autorización para editar este documento, enviandote a la versión de vista...");
             window.location.href = `../Viewer/view.html?id=${docId}`;

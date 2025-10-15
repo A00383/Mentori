@@ -593,7 +593,15 @@ async function uploadBlobToBucket(bucketName, path, blob) {
 
     const { data, error } = await supabase.storage
         .from(bucketName)
-        .upload(path, blob, { upsert: true });
+        .upload(path, blob, {
+            upsert: true,
+            metadata: {
+                uploaded_by: user.id,          // ✅ UUID, valid
+                uploaded_at: new Date().toISOString(),
+                // If you want to attach your documentId safely:
+                document_id: path.split('/')[0] // stores as string, not UUID
+            }
+        });
 
     if (error) throw error;
 

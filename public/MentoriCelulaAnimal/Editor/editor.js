@@ -6,7 +6,7 @@
 // Top-level imports (must be at top)
 // -----------------------------
 
-import { supabase, supabaseUrl, supabaseAnonKey, IMGS_BUCKET } from "../../supabase.js";
+import { supabase, IMGS_BUCKET } from "../../supabase.js";
 import { nanoid } from 'https://cdn.jsdelivr.net/npm/nanoid/nanoid.js';
 
 
@@ -517,7 +517,7 @@ async function getUserSupabaseClient() {
     if (error) throw error;
     if (!session) throw new Error("User not logged in");
 
-    return createClient(supabaseUrl, supabaseAnonKey, {
+    return createClient(supabase, {
         global: {
             headers: { Authorization: `Bearer ${session.access_token}` },
         },

@@ -635,47 +635,34 @@ function extensionFromMime(mime) {
 }
 
 
-// ------------------------------
+// -----------------------------
 // Copy Button
-// ------------------------------
+// -----------------------------
 if (copyBtn) {
-    copyBtn.addEventListener('click', async () => {
-        const content = gatherEditorContent(); // get current editor content
+    copyBtn.addEventListener("click", async () => {
+        const content = gatherEditorContent();
         const user = await getCurrentUser();
 
         if (!user) {
-            alert('Debes haber iniciado sesión para copiar un documento');
+            alert("Debes haber iniciado sesión para copiar un documento");
             return;
         }
 
         try {
-            // Create new document with same content (only description will be stored in documents.content)
             const newId = await createDocument(content);
-
-            // Upload images to bucket for the new document (so the copied doc is complete)
-            // We reuse the same upload routine as save-online below but simplified (no permission checks needed)
             await uploadAllImagesForDocument(newId, content);
-
-            // Create organelles row for new doc with text content
             await upsertOrganellesText(newId, content);
-
-            // Open new editor window with new document
-            window.open(`/MentoriCelulaAnimal/Editor/editor.html?id=${newId}`, '_blank');
+            window.open(`/MentoriCelulaAnimal/Editor/editor.html?id=${newId}`, "_blank");
         } catch (err) {
             console.error(err);
-            alert('Error al copiar el documento: ' + err.message);
+            alert("Error al copiar el documento: " + err.message);
         }
     });
 }
 
 // -----------------------------
-// Save online (create or update) — NEW behavior
-// - documents.content stores ONLY the description (text area).
-// - organelles table stores each organelle's textual content in its corresponding column.
-// - images (main + organelle) are uploaded to Supabase Storage bucket under folder named after the document id.
-// - local save behavior remains unchanged.
+// Save Online Button
 // -----------------------------
-// Save online button logic
 if (saveonlinebutton) {
     saveonlinebutton.addEventListener("click", async () => {
         const content = gatherEditorContent();
@@ -683,10 +670,9 @@ if (saveonlinebutton) {
 
         try {
             const user = await getCurrentUser();
-            if (!user) return alert("Debes estar en una cuenta para poder guardar en línea.");
+            if (!user) return alert("Debes iniciar sesión para guardar en línea.");
 
             if (currentDocId) {
-                // --- Existing document ---
                 const doc = await loadDocumentById(currentDocId);
                 if (!doc) return alert("No se encontró el documento.");
                 if (doc.creator !== user.email)
@@ -695,14 +681,11 @@ if (saveonlinebutton) {
                 await updateDocument(currentDocId, content);
                 await uploadAllImagesForDocument(currentDocId, content);
                 await upsertOrganellesText(currentDocId, content);
-
                 alert("Documento guardado exitosamente!");
             } else {
-                // --- New document ---
                 const newId = await createDocument(content);
                 await uploadAllImagesForDocument(newId, content);
                 await upsertOrganellesText(newId, content);
-
                 alert("Documento guardado exitosamente!");
                 window.location.href = `../Editor/editor.html?id=${newId}`;
             }
@@ -832,39 +815,29 @@ if (loadBtn && loadInput) {
 }
 
 // -----------------------------
-// Auto-load dataset & enforce creator-only access
-//    On page load (DOMContentLoaded) we:
-//     - refresh sign-in UI
-//     - if docId present: load document row from documents table
-//         - if not found -> redirect to viewer
-//         - if user != creator -> redirect to viewer
-//         - populate editor with local-style content if doc.content is JSON (backwards compat)
-//         - populate description from documents.content
-//         - load main images list from bucket folder `${docId}/main_imgs` and add images to mainimagesContainer
-//         - load organelles text from organelles table and set dataset.content
-//         - load organelle images from bucket folder `${docId}/{organelFolder}` and set dataset.image to JSON array of public urls
+// Sign-in UI handling
 // -----------------------------
 async function refreshSignInUI() {
     const user = await getCurrentUser();
     if (signInBtn) {
-        signInBtn.style.display = user ? 'none' : 'inline-block';
+        signInBtn.style.display = user ? "none" : "inline-block";
     }
 }
 
-// Listen to auth state changes so UI updates instantly on sign in/out
-supabase.auth.onAuthStateChange((_event, _session) => {
-    refreshSignInUI().catch(err => console.error('refreshSignInUI error', err));
+supabase.auth.onAuthStateChange(() => {
+    refreshSignInUI().catch(err => console.error("refreshSignInUI error", err));
 });
 
-window.addEventListener('DOMContentLoaded', async () => {
-    // Update sign-in button visibility at startup
+// -----------------------------
+// Load document on startup
+// -----------------------------
+window.addEventListener("DOMContentLoaded", async () => {
     await refreshSignInUI();
 
     const docId = new URLSearchParams(window.location.search).get("id");
     if (!docId) return;
 
     try {
-        // 1) Load document row
         const doc = await loadDocumentById(docId);
         if (!doc) {
             alert("Documento no encontrado.");
@@ -873,114 +846,68 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
 
         const user = await getCurrentUser();
-        console.log("👤 Auth user from Supabase:", user);
-        console.log("📄 Document creator from DB:", doc.creator);
         if (!user || user.id !== doc.owner_id) {
-            alert("No tienes la autorización para editar este documento, enviandote a la versión de vista...");
+            alert("No tienes autorización para editar este documento. Redirigiendo a vista...");
             window.location.href = `../Viewer/view.html?id=${docId}`;
             return;
         }
 
-        // 2) Populate description (documents.content stores only description per your spec)
-        if (doc.content) {
+        // Populate text description
+        if (doc.content?.description) {
             const descElem = document.getElementById("description");
-            if (descElem) descElem.value = doc.content;
+            if (descElem) descElem.value = doc.content.description;
         }
 
-        // 3) Try to populate from doc.content if it contains JSON (legacy support)
-        // If doc.content is actually JSON with the old shape, allow populateEditorWithContent to run.
-        // This keeps backwards compatibility for older documents that were saved as full JSON objects.
-        try {
-            // If content is JSON text (starts with { or [ ) attempt parse and populate
-            if (typeof doc.content === 'string' && (doc.content.trim().startsWith('{') || doc.content.trim().startsWith('['))) {
-                // Attempt parsing
-                const parsed = JSON.parse(doc.content);
-                // populateEditorWithContent expects the shape from gatherEditorContent
-                populateEditorWithContent(parsed);
-            }
-        } catch (err) {
-            // not JSON -> ignore
-        }
-
-        // 4) Load main images from bucket `${docId}/main_imgs/`
-        // We list files under `${docId}/main_imgs` to find stored images.
-        const mainFolder = `${docId}/main_imgs`;
+        // Load main images
+        const mainFolder = `docs/${docId}/main_imgs`;
         const mainFiles = await listBucketFiles(mainFolder);
         if (mainimagesContainer) {
             mainimagesContainer.innerHTML = "";
             for (const file of mainFiles) {
-                try {
-                    // Construct path and fetch public URL
-                    const filePath = `${mainFolder}/${file.name}`;
-                    const publicUrl = getPublicUrlForPath(filePath);
-                    if (!publicUrl) continue;
-                    const img = document.createElement("img");
-                    img.src = publicUrl;
-                    img.classList.add("main-image");
-                    img.dataset.src = publicUrl;
-                    attachMainImageBehavior(img);
-                    mainimagesContainer.appendChild(img);
-                } catch (err) {
-                    console.warn("Failed to append main image from bucket:", err);
-                }
+                const filePath = `${mainFolder}/${file.name}`;
+                const publicUrl = getPublicUrlForPath(filePath);
+                if (!publicUrl) continue;
+                const img = document.createElement("img");
+                img.src = publicUrl;
+                img.classList.add("main-image");
+                img.dataset.src = publicUrl;
+                attachMainImageBehavior(img);
+                mainimagesContainer.appendChild(img);
             }
         }
 
-        // 5) Load organelles text row
-        const { data: orgRow, error: orgErr } = await supabase
-            .from('organelles')
-            .select('*')
-            .eq('document_id', docId)
+        // Load organelles
+        const { data: orgRow } = await supabase
+            .from("organelles")
+            .select("*")
+            .eq("document_id", docId)
             .maybeSingle();
 
-        if (orgErr) {
-            console.warn('Failed to fetch organelles row:', orgErr);
-        }
-
-        // If organelles row exists, set dataset.content for each organelle element
         if (orgRow) {
             for (const domId in ORGANELLE_COLUMN_MAP) {
                 const colName = ORGANELLE_COLUMN_MAP[domId];
                 const el = document.getElementById(domId);
-                if (!el) continue;
-                const val = orgRow[colName] ?? "";
-                el.dataset.content = val;
+                if (el) el.dataset.content = orgRow[colName] ?? "";
             }
 
-            // Now for each organelle also list images in `${docId}/{folderName}/` and set dataset.image to JSON array of public urls
             for (const domId in ORGANELLE_COLUMN_MAP) {
                 const el = document.getElementById(domId);
                 if (!el) continue;
                 const folderName = organelleFolderName(domId);
-                const folderPath = `${docId}/${folderName}`;
+                const folderPath = `docs/${docId}/${folderName}`;
                 const files = await listBucketFiles(folderPath);
-                const urls = [];
-                for (const file of files) {
-                    try {
-                        const p = `${folderPath}/${file.name}`;
-                        const publicUrl = getPublicUrlForPath(p);
-                        if (publicUrl) urls.push(publicUrl);
-                    } catch (err) {
-                        console.warn(`Failed to get public URL for ${file.name}:`, err);
-                    }
-                }
-                // set dataset.image to the array of urls (this is what other code expects)
+                const urls = files.map(f => getPublicUrlForPath(`${folderPath}/${f.name}`)).filter(Boolean);
                 el.dataset.image = JSON.stringify(urls);
             }
-        } else {
-            // If no organelles row exists, leave current dataset.content/dataset.image as-is (maybe they were set locally)
         }
 
-        // Finally, if popup was open or DOM expects images to have handlers, attach behavior to any images we added
-        document.querySelectorAll('.main-image').forEach(attachMainImageBehavior);
-        document.querySelectorAll('.pop-up-image').forEach(attachPopupImageBehavior);
+        document.querySelectorAll(".main-image").forEach(attachMainImageBehavior);
+        document.querySelectorAll(".pop-up-image").forEach(attachPopupImageBehavior);
 
     } catch (err) {
-        console.error("❌ Failed to load document, full error details:", err);
+        console.error("❌ Failed to load document:", err);
         alert(`Error: ${err.message}`);
-        debugger; // Pause script so we can inspect in DevTools
     }
-
 });
 
 //---------------------

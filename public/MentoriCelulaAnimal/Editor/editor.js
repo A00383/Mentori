@@ -557,54 +557,30 @@ async function loadDocumentById(id) {
 async function uploadBlobToBucket(blobOrFile, path) {
     if (!blobOrFile) throw new Error('No file/blob provided to uploadBlobToBucket');
 
-    // supabase.storage upload expects a File or Blob; we'll provide blobOrFile as-is
+    // ✅ Ensure the user is signed in — Storage requires a valid UUID owner_id
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError) throw userError;
+    if (!userData?.user) throw new Error("You must be logged in to upload files.");
+
+    // ✅ Upload (Supabase automatically assigns owner_id = user.id)
     const { data, error } = await supabase.storage
         .from(IMGS_BUCKET)
         .upload(path, blobOrFile, { upsert: true });
 
     if (error) {
-        // If file already exists and upsert failed, still try to continue by returning public URL if possible.
+        console.error("❌ uploadBlobToBucket upload error:", error.message);
         throw error;
     }
 
-    // get public url
+    // ✅ Get the public URL
     const { data: publicData, error: publicErr } = await supabase.storage
         .from(IMGS_BUCKET)
         .getPublicUrl(path);
 
-    if (publicErr) {
-        throw publicErr;
-    }
+    if (publicErr) throw publicErr;
 
-    // different supabase SDK versions return slightly different shapes; handle both
-    const publicUrl = (publicData && (publicData.publicUrl || publicData.public_url)) || null;
+    const publicUrl = publicData?.publicUrl || publicData?.public_url || null;
     return publicUrl;
-}
-
-/**
- * List files in the given folder path within the bucket.
- * Returns array of file metadata objects ({name, ...}) or empty array.
- */
-async function listBucketFiles(folderPath) {
-    const { data, error } = await supabase.storage
-        .from(IMGS_BUCKET)
-        .list(folderPath || '', { limit: 1000, offset: 0 });
-
-    if (error) {
-        // don't throw in listing - return empty array to allow the UI to continue (but log)
-        console.warn('listBucketFiles error:', error);
-        return [];
-    }
-    return data || [];
-}
-
-/**
- * Given a path in the bucket, return the public URL.
- */
-function getPublicUrlForPath(path) {
-    const { data } = supabase.storage.from(IMGS_BUCKET).getPublicUrl(path);
-    // support different shapes
-    return (data && (data.publicUrl || data.public_url)) || null;
 }
 
 /**

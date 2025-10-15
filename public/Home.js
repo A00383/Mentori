@@ -1,5 +1,64 @@
 import { supabase } from "./supabase.js";
 
+// =======================
+// STORAGE CLEANUP HELPER
+// =======================
+async function deleteDocumentImages(documentId) {
+    try {
+        console.log(`🗑️ Deleting images for document: ${documentId}`);
+
+        // List all files and folders inside this document’s folder
+        const { data: files, error: listError } = await supabase.storage
+            .from("CelulaAnimalImgs") // ✅ your bucket name
+            .list(documentId, { limit: 1000 });
+
+        if (listError) {
+            console.warn("⚠️ Failed to list folder:", listError.message);
+            return;
+        }
+
+        // If there are no files or folders, nothing to do
+        if (!files || files.length === 0) {
+            console.log("📂 No images to delete for", documentId);
+            return;
+        }
+
+        // Collect all paths (files and subfiles)
+        const pathsToDelete = [];
+
+        for (const f of files) {
+            if (f.name.includes(".")) {
+                // It's a file directly in /documentId/
+                pathsToDelete.push(`${documentId}/${f.name}`);
+            } else {
+                // It's a folder — list its contents too
+                const { data: subFiles } = await supabase.storage
+                    .from("CelulaAnimalImgs")
+                    .list(`${documentId}/${f.name}`);
+                for (const sf of subFiles) {
+                    pathsToDelete.push(`${documentId}/${f.name}/${sf.name}`);
+                }
+            }
+        }
+
+        if (pathsToDelete.length === 0) return;
+
+        // Delete all files in one call
+        const { error: deleteError } = await supabase.storage
+            .from("CelulaAnimalImgs")
+            .remove(pathsToDelete);
+
+        if (deleteError) {
+            console.error("❌ Failed to delete storage files:", deleteError.message);
+        } else {
+            console.log(`✅ Deleted ${pathsToDelete.length} files for document ${documentId}`);
+        }
+    } catch (err) {
+        console.error("⚠️ deleteDocumentImages failed:", err);
+    }
+}
+
+
 async function testConnection() {
     const { data, error } = await supabase.auth.getSession();
     if (error) console.error("Auth session error:", error);
@@ -144,18 +203,29 @@ async function listUserDocs() {
         deleteBtn.style.color = "red";
         deleteBtn.addEventListener("click", async (e) => {
             e.stopPropagation();
-            if (confirm("Are you sure you want to delete this document?")) {
+            if (!confirm("¿Seguro que quieres borrar este documento y sus imágenes?")) return;
+
+            try {
+                // 1️⃣ Delete the document record
                 const { error: deleteError } = await supabase
                     .from("documents")
                     .delete()
                     .eq("id", doc.id);
-                if (deleteError) {
-                    console.error("Delete error:", deleteError);
-                } else {
-                    card.remove();
-                }
+
+                if (deleteError) throw deleteError;
+
+                // 2️⃣ Delete all its images from the bucket
+                await deleteDocumentImages(doc.id);
+
+                // 3️⃣ Remove the card from the UI
+                card.remove();
+                console.log(`✅ Deleted document ${doc.id} and its images`);
+            } catch (err) {
+                console.error("❌ Delete error:", err);
+                alert("Error al borrar el documento: " + err.message);
             }
         });
+
 
         actions.appendChild(renameBtn);
         actions.appendChild(deleteBtn);

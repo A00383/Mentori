@@ -701,6 +701,7 @@ if (copyBtn) {
 // - images (main + organelle) are uploaded to Supabase Storage bucket under folder named after the document id.
 // - local save behavior remains unchanged.
 // -----------------------------
+// Save online button logic
 if (saveonlinebutton) {
     saveonlinebutton.addEventListener("click", async () => {
         const content = gatherEditorContent();
@@ -708,36 +709,27 @@ if (saveonlinebutton) {
 
         try {
             const user = await getCurrentUser();
-            if (!user) return alert("Debes estar en una cuenta para poder guardar en linea.");
+            if (!user) return alert("Debes estar en una cuenta para poder guardar en línea.");
 
-            // if docId exists -> load and check ownership
             if (currentDocId) {
+                // --- Existing document ---
                 const doc = await loadDocumentById(currentDocId);
-                if (!doc) return alert("No se encontro el documento.");
-                if (doc.creator !== user.email) return alert("Tú no eres el creador de este documento.");
+                if (!doc) return alert("No se encontró el documento.");
+                if (doc.creator !== user.email)
+                    return alert("Tú no eres el creador de este documento.");
 
-                // Update documents.content with description only
                 await updateDocument(currentDocId, content);
-
-                // Upload images for this document into bucket
                 await uploadAllImagesForDocument(currentDocId, content);
-
-                // Upsert organelles text content into organelles table
                 await upsertOrganellesText(currentDocId, content);
 
                 alert("Documento guardado exitosamente!");
             } else {
-                // create a new document and then upload assets
+                // --- New document ---
                 const newId = await createDocument(content);
-
-                // upload images to bucket
                 await uploadAllImagesForDocument(newId, content);
-
-                // upsert organelles text (create row)
                 await upsertOrganellesText(newId, content);
 
                 alert("Documento guardado exitosamente!");
-                // Redirect to editor with new id
                 window.location.href = `../Editor/editor.html?id=${newId}`;
             }
         } catch (err) {
@@ -758,19 +750,26 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
     for (let i = 0; i < mainImgs.length; i++) {
         const src = mainImgs[i].src;
         try {
-            // Skip if already uploaded
-            if (src && src.startsWith('http') && src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
+            // ✅ Skip already uploaded images
+            if (
+                src &&
+                src.startsWith("http") &&
+                src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)
+            ) {
                 continue;
             }
 
             const blob = await getBlobFromSrc(src);
-            const ext = extensionFromMime(blob.type);
+            if (!blob) throw new Error("Invalid blob for main image " + i);
+
+            const ext = extensionFromMime(blob.type || "image/png");
             const filename = `main_imgs/img_${i}_${crypto.randomUUID()}.${ext}`;
             const path = `${documentId}/${filename}`;
 
-            const publicUrl = await uploadBlobToBucket(blob, path);
+            // ✅ Correct argument order (bucketName, path, blob)
+            const publicUrl = await uploadBlobToBucket(IMGS_BUCKET, path, blob);
 
-            // Update image src to point to Supabase public URL
+            // ✅ Update <img> src to point to Supabase URL
             mainImgs[i].src = publicUrl;
             mainImgs[i].dataset.src = publicUrl;
         } catch (err) {
@@ -787,28 +786,45 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
             imgs = [];
         }
 
-        const folderName = organelleFolderName(organel.id || organel.dataset?.organelId || 'unknown');
+        const folderName = organelleFolderName(
+            organel.id || organel.dataset?.organelId || "unknown"
+        );
         const newUrls = [];
 
         for (let i = 0; i < imgs.length; i++) {
             const src = imgs[i];
             try {
-                if (src && src.startsWith('http') && src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
+                if (
+                    src &&
+                    src.startsWith("http") &&
+                    src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)
+                ) {
                     newUrls.push(src);
                     continue;
                 }
 
                 const blob = await getBlobFromSrc(src);
-                const ext = extensionFromMime(blob.type);
+                if (!blob) throw new Error(`Invalid blob for ${folderName} image ${i}`);
+
+                const ext = extensionFromMime(blob.type || "image/png");
                 const filename = `${folderName}/img_${i}_${crypto.randomUUID()}.${ext}`;
                 const path = `${documentId}/${filename}`;
-                const publicUrl = await uploadBlobToBucket(blob, path);
+
+                const publicUrl = await uploadBlobToBucket(IMGS_BUCKET, path, blob);
                 newUrls.push(publicUrl);
             } catch (err) {
-                console.warn(`⚠️ Failed to upload image for organelle ${organel.id}:`, err);
+                console.warn(`⚠️ Failed to upload image for organelle ${folderName}:`, err);
                 if (src) newUrls.push(src);
             }
         }
+
+        // ✅ Update organelle image data
+        organel.dataset.image = JSON.stringify(newUrls);
+    }
+
+    return true;
+}
+
 
         // Update dataset.image for the organelle
         try {

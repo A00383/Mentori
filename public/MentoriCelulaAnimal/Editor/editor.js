@@ -6,7 +6,7 @@
 // Top-level imports (must be at top)
 // -----------------------------
 
-import { supabase, IMGS_BUCKET } from "../../supabase.js";
+import { supabase, supabaseUrl, supabaseAnonKey, IMGS_BUCKET } from "../../supabase.js";
 import { nanoid } from 'https://cdn.jsdelivr.net/npm/nanoid/nanoid.js';
 
 

@@ -498,9 +498,18 @@ if (savebtn) {
 // -----------------------------
 // Supabase Online Save & Load helpers
 // -----------------------------
-async function getCurrentUser() {
-    const { data } = await supabase.auth.getSession();
-    return data?.session?.user ?? null;
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+async function getUserSupabaseClient() {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    if (!session) throw new Error("User not logged in");
+
+    return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        global: {
+            headers: { Authorization: `Bearer ${session.access_token}` },
+        },
+    });
 }
 
 // createDocument now expects an editorContent object (the same object returned by gatherEditorContent),
@@ -550,9 +559,6 @@ async function loadDocumentById(id) {
 // -----------------------------
 // Storage helpers (uploading / listing / getting public URLs)
 // -----------------------------
-// -----------------------------
-// Storage helpers (uploading / listing / getting public URLs)
-// -----------------------------
 /**
  * Upload a Blob/File to Supabase storage, path is like `${docId}/main_imgs/img0.png`.
  * Returns public URL string.
@@ -594,9 +600,6 @@ async function uploadBlobToBucket(bucketName, filePath, blob) {
 
     return publicData?.publicUrl || null;
 }
-
-
-
 
 
 /**

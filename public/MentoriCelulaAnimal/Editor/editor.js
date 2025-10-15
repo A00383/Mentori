@@ -512,20 +512,6 @@ if (savebtn) {
 // Supabase Online Save & Load helpers
 // -----------------------------
 
-async function getUserSupabaseClient() {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) throw error;
-    if (!session) throw new Error("User not logged in");
-
-    // ✅ Create a new client authenticated with the user's token
-    return createClient(SUPABASE_URL, SUPABASE_KEY, {
-        global: {
-            headers: {
-                Authorization: `Bearer ${session.access_token}`,
-            },
-        },
-    });
-}
 
 
 // createDocument now expects an editorContent object (the same object returned by gatherEditorContent),

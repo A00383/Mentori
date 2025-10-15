@@ -8,7 +8,6 @@ async function testConnection() {
 
 testConnection();
 
-import { supabase } from "./supabase.js";
 import { nanoid } from "https://cdn.jsdelivr.net/npm/nanoid/nanoid.js";
 
 const userDiv = document.getElementById("user");

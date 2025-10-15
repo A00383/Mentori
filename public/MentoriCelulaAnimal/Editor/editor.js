@@ -516,17 +516,16 @@ async function getUserSupabaseClient() {
     if (error) throw error;
     if (!session) throw new Error("User not logged in");
 
-    // ✅ Use the current supabase URL/key, not the documentId
-    return createClient(
-        supabase.supabaseUrl,
-        supabase.supabaseKey,
-        {
-            global: {
-                headers: { Authorization: `Bearer ${session.access_token}` },
+    // ✅ Create a new client authenticated with the user's token
+    return createClient(SUPABASE_URL, SUPABASE_KEY, {
+        global: {
+            headers: {
+                Authorization: `Bearer ${session.access_token}`,
             },
-        }
-    );
+        },
+    });
 }
+
 
 // createDocument now expects an editorContent object (the same object returned by gatherEditorContent),
 // but only stores description into documents.content (per your requirements).
@@ -585,37 +584,34 @@ async function loadDocumentById(id) {
  */
 
 async function uploadBlobToBucket(bucketName, path, blob) {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const userClient = await getUserSupabaseClient();
+
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError) throw userError;
     if (!user) throw new Error("User not logged in");
 
     console.log(`🪣 Uploading ${bucketName}/${path} for user ${user.id}`);
 
-    const { data, error } = await supabase.storage
+    const { data, error } = await userClient.storage
         .from(bucketName)
         .upload(path, blob, {
             upsert: true,
             metadata: {
-                uploaded_by: user.id,          // ✅ UUID, valid
+                uploaded_by: user.id,
                 uploaded_at: new Date().toISOString(),
-                // If you want to attach your documentId safely:
-                document_id: path.split('/')[0] // stores as string, not UUID
-            }
+                document_id: path.split("/")[0],
+            },
         });
 
     if (error) throw error;
 
-    const { data: publicData } = supabase.storage
+    const { data: publicData } = userClient.storage
         .from(bucketName)
         .getPublicUrl(path);
 
     console.log("✅ Uploaded URL:", publicData.publicUrl);
     return publicData.publicUrl;
 }
-
-
-
-
 
 /**
  * List all files inside a Supabase Storage folder.

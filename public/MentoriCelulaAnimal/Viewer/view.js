@@ -1,7 +1,7 @@
 // -----------------------------
 // --- Handle Supabase OAuth hash ---
 // -----------------------------
-import { supabase } from '../../supabase.js';
+import { supabase, IMGS_BUCKET } from '../../supabase.js';
 
 (async () => {
     if (window.location.hash.includes("access_token")) {
@@ -53,6 +53,23 @@ const aparatodegolgi = document.getElementById('aparato de golgi');
 // -----------------------------
 let currentogranel = null;
 
+//-----------------------------
+//Organelles column map
+//------------------------------
+const ORGANELLE_COLUMN_MAP = {
+    // DOM element id            // SQL column
+    "membrana celular": "membrana_celular_content",
+    "citoplasma": "citoplasma_content",
+    "nucleolo": "nucleolo_content",
+    "nucleo": "nucleo_content",
+    "reticulo endoplasmatico": "reticulo_endoplasmatico_content",
+    "centriolos": "centriolos_content",
+    "microtubulos": "microtubulos_content",
+    "mitocondrias": "mitocondrias_content",
+    "lisosomas": "lisosomas_content",
+    "aparato de golgi": "aparato_de_golgi_content",
+    "ribosomas": "ribosomas_content"
+};
 // -----------------------------
 // Auth Helpers
 // -----------------------------

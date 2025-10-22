@@ -611,9 +611,6 @@ async function uploadBlobToBucket(bucketName, path, blob) {
 
     console.log(`🪣 Uploading ${bucketName}/${path} for user ${user.id}`);
 
-    // ✅ FIXED HERE:
-    // Do NOT pass owner_id or any metadata that could trigger a UUID validation.
-    // Use only safe metadata fields.
     const { data, error } = await supabase.storage
         .from(bucketName)
         .upload(path, blob, {

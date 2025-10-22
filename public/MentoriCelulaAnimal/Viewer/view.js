@@ -240,81 +240,97 @@ if (saveonlinebutton) {
     });
 }
 
-// -----------------------------
-// Load document on startup
-// -----------------------------
+//------------------------------
+// Load Document On Start-up
+//------------------------------
+
 window.addEventListener("DOMContentLoaded", async () => {
-    await refreshSignInUI();
+    // Restore session
+    const { data: { session } } = await supabase.auth.getSession();
+    await renderUser();
 
     const docId = new URLSearchParams(window.location.search).get("id");
     if (!docId) return;
 
     try {
-        const doc = await loadDocumentById(docId);
-        if (!doc) {
-            alert("Documento no encontrado.");
-            window.location.href = "../Viewer/view.html";
-            return;
+        // --- 1️⃣ Load main document content ---
+        const { data: doc, error: docError } = await supabase
+            .from("documents")
+            .select("content")
+            .eq("id", docId)
+            .maybeSingle();
+        if (docError) throw docError;
+        if (!doc) throw new Error("Documento no encontrado");
+
+        // Description text area
+        const descriptionInput = document.getElementById("description");
+        if (descriptionInput && doc.content?.description) {
+            descriptionInput.value = doc.content.description;
         }
 
-
-        // Populate text description
-        if (doc.content?.description) {
-            const descElem = document.getElementById("description");
-            if (descElem) descElem.value = doc.content.description;
-        }
-
-        // Load main images
+        // --- 2️⃣ Load main images ---
         const mainFolder = `${docId}/main_imgs`;
-        const mainFiles = await listBucketFiles(mainFolder);
-        if (mainimagesContainer) {
-            mainimagesContainer.innerHTML = "";
-            for (const file of mainFiles) {
-                const filePath = `${mainFolder}/${file.name}`;
-                const publicUrl = getPublicUrlForPath(filePath);
-                if (!publicUrl) continue;
-                const img = document.createElement("img");
-                img.src = publicUrl;
-                img.classList.add("main-image");
-                img.dataset.src = publicUrl;
-                attachMainImageBehavior(img);
-                mainimagesContainer.appendChild(img);
-            }
+        const { data: mainFiles, error: mainErr } = await supabase.storage
+            .from(IMGS_BUCKET)
+            .list(mainFolder, { limit: 100 });
+        if (mainErr) console.warn("No se pudieron listar imágenes principales:", mainErr);
+
+        mainimagesContainer.innerHTML = "";
+        for (const file of mainFiles || []) {
+            const { data: publicUrlData } = supabase.storage
+                .from(IMGS_BUCKET)
+                .getPublicUrl(`${mainFolder}/${file.name}`);
+            const img = document.createElement("img");
+            img.src = publicUrlData.publicUrl;
+            img.classList.add("main-image");
+            mainimagesContainer.appendChild(img);
         }
 
-        // Load organelles
-        const { data: orgRow } = await supabase
+        // --- 3️⃣ Load organelle text content ---
+        const { data: organelles, error: orgErr } = await supabase
             .from("organelles")
             .select("*")
-            .eq("document_id", docId)
-            .maybeSingle();
+            .eq("document_id", docId);
+        if (orgErr) throw orgErr;
 
-        if (orgRow) {
+        // If one row with many columns (old style)
+        if (organelles && organelles.length === 1) {
+            const orgRow = organelles[0];
             for (const domId in ORGANELLE_COLUMN_MAP) {
-                const colName = ORGANELLE_COLUMN_MAP[domId];
+                const col = ORGANELLE_COLUMN_MAP[domId];
                 const el = document.getElementById(domId);
-                if (el) el.dataset.content = orgRow[colName] ?? "";
-            }
-
-            for (const domId in ORGANELLE_COLUMN_MAP) {
-                const el = document.getElementById(domId);
-                if (!el) continue;
-                const folderName = organelleFolderName(domId);
-                const folderPath = `${docId}/${folderName}`;
-                const files = await listBucketFiles(folderPath);
-                const urls = files.map(f => getPublicUrlForPath(`${folderPath}/${f.name}`)).filter(Boolean);
-                el.dataset.image = JSON.stringify(urls);
+                if (el) el.dataset.content = orgRow[col] ?? "";
             }
         }
 
-        document.querySelectorAll(".main-image").forEach(attachMainImageBehavior);
-        document.querySelectorAll(".pop-up-image").forEach(attachPopupImageBehavior);
+        // --- 4️⃣ Load organelle images ---
+        for (const domId in ORGANELLE_COLUMN_MAP) {
+            const folderName = domId.replaceAll(" ", "_"); // ensure it matches your bucket naming
+            const folderPath = `${docId}/${folderName}`;
+            const { data: files, error: imgErr } = await supabase.storage
+                .from(IMGS_BUCKET)
+                .list(folderPath, { limit: 100 });
+            if (imgErr) continue;
+
+            const urls = (files || []).map(f => {
+                const { data } = supabase.storage
+                    .from(IMGS_BUCKET)
+                    .getPublicUrl(`${folderPath}/${f.name}`);
+                return data.publicUrl;
+            });
+
+            const el = document.getElementById(domId);
+            if (el) el.dataset.image = JSON.stringify(urls);
+        }
+
+        console.log("✅ Document loaded successfully");
 
     } catch (err) {
-        console.error("❌ Failed to load document:", err);
-        alert(`Error: ${err.message}`);
+        console.error("❌ Error loading viewer content:", err);
+        alert("No se pudo cargar el documento: " + err.message);
     }
 });
+
 
 import { nanoid } from "https://cdn.jsdelivr.net/npm/nanoid/nanoid.js";
 

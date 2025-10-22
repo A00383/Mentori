@@ -244,6 +244,7 @@ if (saveonlinebutton) {
 // Load document on startup
 // -----------------------------
 window.addEventListener("DOMContentLoaded", async () => {
+    await refreshSignInUI();
 
     const docId = new URLSearchParams(window.location.search).get("id");
     if (!docId) return;
@@ -252,8 +253,10 @@ window.addEventListener("DOMContentLoaded", async () => {
         const doc = await loadDocumentById(docId);
         if (!doc) {
             alert("Documento no encontrado.");
+            window.location.href = "../Viewer/view.html";
             return;
         }
+
 
         // Populate text description
         if (doc.content?.description) {

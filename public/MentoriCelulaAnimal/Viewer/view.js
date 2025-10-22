@@ -244,7 +244,6 @@ if (saveonlinebutton) {
 // Load document on startup
 // -----------------------------
 window.addEventListener("DOMContentLoaded", async () => {
-    await refreshSignInUI();
 
     const docId = new URLSearchParams(window.location.search).get("id");
     if (!docId) return;

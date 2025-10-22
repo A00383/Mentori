@@ -392,6 +392,21 @@ window.addEventListener("DOMContentLoaded", async () => {
 import { nanoid } from "https://cdn.jsdelivr.net/npm/nanoid/nanoid.js";
 
 // -----------------------------
+// Helper: Load document by ID
+// -----------------------------
+async function loadDocumentById(id) {
+    const { data, error } = await supabase
+        .from("documents")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+
+    if (error) throw error;
+    return data;
+}
+
+
+// -----------------------------
 // Copy Button (duplicate doc)
 // -----------------------------
 if (copyBtn) {

@@ -181,6 +181,63 @@ function populateViewerWithContent(data) {
     });
 }
 
+// ----------------------
+// Copy Helpers (same as editor)
+// ----------------------
+async function copyDocumentImages(oldId, newId) {
+    console.log(`📦 Copying images from ${oldId} → ${newId}`);
+
+    const { data: files, error } = await supabase.storage
+        .from(IMGS_BUCKET)
+        .list(oldId, { limit: 1000 });
+
+    if (error) {
+        console.warn("⚠️ Failed to list source folder:", error.message);
+        return;
+    }
+
+    for (const f of files) {
+        if (f.name.includes(".")) {
+            // File directly under /oldId
+            await copyFile(`${oldId}/${f.name}`, `${newId}/${f.name}`);
+        } else {
+            // Folder — recurse
+            const { data: subFiles } = await supabase.storage
+                .from(IMGS_BUCKET)
+                .list(`${oldId}/${f.name}`);
+            for (const sf of subFiles) {
+                await copyFile(
+                    `${oldId}/${f.name}/${sf.name}`,
+                    `${newId}/${f.name}/${sf.name}`
+                );
+            }
+        }
+    }
+
+    console.log(`✅ Finished copying images for ${newId}`);
+}
+
+async function copyFile(srcPath, destPath) {
+    const { data, error } = await supabase.storage
+        .from(IMGS_BUCKET)
+        .download(srcPath);
+    if (error) {
+        console.warn("⚠️ Failed to download file:", srcPath, error.message);
+        return;
+    }
+
+    const blob = data;
+    const { error: uploadError } = await supabase.storage
+        .from(IMGS_BUCKET)
+        .upload(destPath, blob, { upsert: true });
+    if (uploadError) {
+        console.warn("⚠️ Failed to upload file:", destPath, uploadError.message);
+    } else {
+        console.log(`📁 Copied ${srcPath} → ${destPath}`);
+    }
+}
+
+
 // -----------------------------
 // Pop-up logic (read-only)
 // -----------------------------
@@ -341,7 +398,7 @@ if (copyBtn) {
     copyBtn.addEventListener('click', async () => {
         const docId = new URLSearchParams(window.location.search).get("id");
         if (!docId) {
-            alert("No se encontro un documento que copiar.");
+            alert("No se encontró un documento que copiar.");
             return;
         }
 
@@ -364,6 +421,7 @@ if (copyBtn) {
             // ✅ clone the content safely
             const newContent = JSON.parse(JSON.stringify(originalDoc.content || {}));
 
+            // ✅ insert the new document owned by the user
             const { data, error } = await supabase
                 .from("documents")
                 .insert([{
@@ -376,18 +434,18 @@ if (copyBtn) {
 
             if (error) throw error;
 
-            if (data && data.id) {
-                window.location.href = `../Editor/editor.html?id=${encodeURIComponent(data.id)}`;
-            } else {
-                alert("Error al crear copia.");
-            }
+            // ✅ copy all associated images from old → new
+            await copyDocumentImages(docId, newId);
 
+            // ✅ redirect to editor view of the new doc
+            window.location.href = `../Editor/editor.html?id=${encodeURIComponent(newId)}`;
         } catch (err) {
             console.error("Copy failed:", err);
             alert("Error al copiar el documento: " + (err.message || err));
         }
     });
 }
+
 
 // -----------------------------
 // Load local .txt dataset

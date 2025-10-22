@@ -241,19 +241,11 @@ if (saveonlinebutton) {
 }
 
 // -----------------------------
-// Supabase load
+// Load document on startup
 // -----------------------------
-async function loadDocumentById(id) {
-    const { data, error } = await supabase.from('documents')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
+window.addEventListener("DOMContentLoaded", async () => {
+    await refreshSignInUI();
 
-    if (error) throw error;
-    return data;
-}
-
-window.addEventListener('DOMContentLoaded', async () => {
     const docId = new URLSearchParams(window.location.search).get("id");
     if (!docId) return;
 
@@ -261,19 +253,65 @@ window.addEventListener('DOMContentLoaded', async () => {
         const doc = await loadDocumentById(docId);
         if (!doc) {
             alert("Documento no encontrado.");
+            window.location.href = "../Viewer/view.html";
             return;
         }
 
-        if (doc.content) {
-            const parsedContent = typeof doc.content === "string"
-                ? JSON.parse(doc.content)
-                : doc.content;
-            populateViewerWithContent(parsedContent);
+        // Populate text description
+        if (doc.content?.description) {
+            const descElem = document.getElementById("description");
+            if (descElem) descElem.value = doc.content.description;
         }
 
+        // Load main images
+        const mainFolder = `${docId}/main_imgs`;
+        const mainFiles = await listBucketFiles(mainFolder);
+        if (mainimagesContainer) {
+            mainimagesContainer.innerHTML = "";
+            for (const file of mainFiles) {
+                const filePath = `${mainFolder}/${file.name}`;
+                const publicUrl = getPublicUrlForPath(filePath);
+                if (!publicUrl) continue;
+                const img = document.createElement("img");
+                img.src = publicUrl;
+                img.classList.add("main-image");
+                img.dataset.src = publicUrl;
+                attachMainImageBehavior(img);
+                mainimagesContainer.appendChild(img);
+            }
+        }
+
+        // Load organelles
+        const { data: orgRow } = await supabase
+            .from("organelles")
+            .select("*")
+            .eq("document_id", docId)
+            .maybeSingle();
+
+        if (orgRow) {
+            for (const domId in ORGANELLE_COLUMN_MAP) {
+                const colName = ORGANELLE_COLUMN_MAP[domId];
+                const el = document.getElementById(domId);
+                if (el) el.dataset.content = orgRow[colName] ?? "";
+            }
+
+            for (const domId in ORGANELLE_COLUMN_MAP) {
+                const el = document.getElementById(domId);
+                if (!el) continue;
+                const folderName = organelleFolderName(domId);
+                const folderPath = `${docId}/${folderName}`;
+                const files = await listBucketFiles(folderPath);
+                const urls = files.map(f => getPublicUrlForPath(`${folderPath}/${f.name}`)).filter(Boolean);
+                el.dataset.image = JSON.stringify(urls);
+            }
+        }
+
+        document.querySelectorAll(".main-image").forEach(attachMainImageBehavior);
+        document.querySelectorAll(".pop-up-image").forEach(attachPopupImageBehavior);
+
     } catch (err) {
-        console.error("Failed to load document:", err);
-        alert("Error al cargar el contenido.");
+        console.error("❌ Failed to load document:", err);
+        alert(`Error: ${err.message}`);
     }
 });
 

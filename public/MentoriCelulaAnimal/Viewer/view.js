@@ -253,7 +253,6 @@ window.addEventListener("DOMContentLoaded", async () => {
         const doc = await loadDocumentById(docId);
         if (!doc) {
             alert("Documento no encontrado.");
-            window.location.href = "../Viewer/view.html";
             return;
         }
 

@@ -793,6 +793,22 @@ if (copyBtn) {
 }
 
 // -----------------------------
+// Helper: Wait until organelles are rendered
+// -----------------------------
+async function waitForOrganeles(timeout = 4000) {
+    const start = performance.now();
+    while (document.querySelectorAll(".organelo").length === 0) {
+        if (performance.now() - start > timeout) {
+            console.warn("⚠️ waitForOrganeles timeout reached, continuing anyway");
+            break;
+        }
+        await new Promise(r => setTimeout(r, 100));
+    }
+    console.log("✅ Organeles ready:", document.querySelectorAll(".organelo").length);
+}
+
+
+// -----------------------------
 // Save Online Button (fully fixed)
 // -----------------------------
 if (saveonlinebutton) {
@@ -861,21 +877,6 @@ if (saveonlinebutton) {
             alert("Error al guardar el documento: " + err.message);
         }
     });
-}
-
-// -----------------------------
-// Helper: Wait until organelles are rendered
-// -----------------------------
-async function waitForOrganeles(timeout = 4000) {
-    const start = performance.now();
-    while (document.querySelectorAll(".organelo").length === 0) {
-        if (performance.now() - start > timeout) {
-            console.warn("⚠️ waitForOrganeles timeout reached, continuing anyway");
-            break;
-        }
-        await new Promise(r => setTimeout(r, 100));
-    }
-    console.log("✅ Organeles ready:", document.querySelectorAll(".organelo").length);
 }
 
 

@@ -447,67 +447,57 @@ window.addEventListener("DOMContentLoaded", async () => {
 });
 
 
-// 🧩 Improved Helper: List images in a folder (works public or logged-in)
+// 🧩 Helper: List images in a folder (works public or logged-in)
 async function listFolderImages(path, basePublicUrl, isLoggedIn) {
-    const urls = [];
-
-    // 1️⃣ Authenticated listing (if logged in)
+    // 1️⃣ Try normal Supabase listing if logged in
     if (isLoggedIn) {
         try {
             const { data, error } = await supabase.storage
                 .from(IMGS_BUCKET)
                 .list(path, { limit: 100 });
-            if (error) throw error;
 
-            for (const file of data) {
-                if (/\.(png|jpg|jpeg|gif|webp)$/i.test(file.name)) {
-                    urls.push(`${basePublicUrl}/${path}/${encodeURIComponent(file.name)}`);
-                }
+            if (error) throw error;
+            if (data && data.length > 0) {
+                return data
+                    .filter(f => /\.(png|jpg|jpeg|gif|webp)$/i.test(f.name))
+                    .map(f => `${basePublicUrl}/${path}/${f.name}`);
             }
-            if (urls.length > 0) return urls;
         } catch (err) {
             console.warn("⚠️ Error listing folder (auth):", path, err.message);
         }
     }
 
-    // 2️⃣ Public (non-authenticated) fallback
-    // We can’t list, but we can try fetching files starting with "img_"
-    const exts = ["png", "jpg", "jpeg", "gif", "webp"];
-    for (let i = 0; i < 10; i++) {
-        for (const ext of exts) {
-            // Try both simple and UUID-based patterns
-            const simpleUrl = `${basePublicUrl}/${path}/img_${i}.${ext}`;
-            if (await imageExists(simpleUrl)) urls.push(simpleUrl);
-
-            // Also try pattern with UUIDs
-            const patternUrl = `${basePublicUrl}/${path}/img_${i}_`;
-            const testUrl = await findFileWithPrefix(patternUrl, ext);
-            if (testUrl) urls.push(testUrl);
-        }
-    }
-
-    return urls;
-}
-
-// 🔎 Helper: Try to find a file with UUID suffix (public fetch)
-async function findFileWithPrefix(prefix, ext) {
-    // Try a few common UUID lengths/patterns (we can't really list anonymously)
-    // Instead, we make a HEAD request with wildcard patterns — Supabase will return 400 unless it matches exactly
-    // So we’ll skip probing random UUIDs and just return null here if listing isn’t allowed.
-    // The actual solution is: store the filenames (e.g. img_0_abc123.gif) in the DB if you want to load them publically.
-    return null;
-}
-
-// 🧩 Helper to check if an image exists
-async function imageExists(url) {
+    // 2️⃣ Fallback for public (non-authenticated)
+    // Since bucket is public, try fetching directly by guessing possible filenames
     try {
-        const res = await fetch(url, { method: "HEAD" });
-        return res.ok;
-    } catch {
-        return false;
+        const possibleNames = [
+            "img_0.png", "img_0.jpg", "img_0.jpeg", "img_0.gif", "img_0.webp",
+            "img_1.png", "img_1.jpg", "img_1.jpeg", "img_1.gif", "img_1.webp"
+        ];
+
+        const found = [];
+        for (const name of possibleNames) {
+            const url = `${basePublicUrl}/${path}/${name}`;
+            if (await imageExists(url)) found.push(url);
+        }
+
+        // If nothing found, maybe folder contains random UUID filenames (e.g. img_0_<uuid>.gif)
+        if (found.length === 0) {
+            // Try direct head request to folder path to detect accessible objects
+            const prefix = `${basePublicUrl}/${path}/img_0_`;
+            const extensions = ["png", "jpg", "jpeg", "gif", "webp"];
+            for (const ext of extensions) {
+                const url = `${prefix}${crypto.randomUUID()}.${ext}`; // test pattern
+                // skip HEAD check since we can’t list, just infer pattern
+            }
+        }
+
+        return found;
+    } catch (err) {
+        console.warn("⚠️ Public fallback failed for", path, err.message);
+        return [];
     }
 }
-
 
 
 // 🧩 Helper to check if an image exists

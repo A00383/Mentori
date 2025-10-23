@@ -496,6 +496,9 @@ if (returnHomeBtn) {
     });
 }
 
+//Image overlay
+
+
 // -----------------------------
 // Organelles hover + click names
 // -----------------------------

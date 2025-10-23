@@ -69,6 +69,7 @@ let currentogranel = null;
 let popupimageremoveMode = false;
 let mainimageremoveMode = false;
 
+
 // -----------------------------
 // Organelles -> DB column mapping
 // Note: columns come from the SQL you supplied. There are some naming differences
@@ -1057,6 +1058,51 @@ if (returnHomeBtn) {
         window.location.href = "/index.html";
     });
 }
+
+const overlay = document.getElementById("image-viewer-overlay");
+const overlayImg = document.getElementById("image-viewer-img");
+const closeoverlayBtn = document.getElementById("close-image-viewer");
+
+// Handle clicks on any image
+document.getElementById("image-container").addEventListener("click", (e) => {
+    const img = e.target.closest("img");
+    if (!img) return;
+
+    if (popupimageremoveMode || mainimageremoveMode) {
+        img.remove();
+        popupimageremoveMode = false;
+        mainimageremoveMode = false;
+        return;
+    }
+
+    // Otherwise open the viewer
+    openImageViewer(img.src);
+});
+
+// Open the image viewer
+function openImageViewer(src) {
+    overlayImg.src = src;
+    overlay.classList.remove("hidden");
+
+    // prevent clicks from closing other popups
+    overlay.addEventListener("click", handleOverlayClick);
+}
+
+// Close viewer
+function closeImageViewer() {
+    overlay.classList.add("hidden");
+    overlayImg.src = "";
+    overlay.removeEventListener("click", handleOverlayClick);
+}
+
+// Click outside image closes viewer
+function handleOverlayClick(e) {
+    if (e.target === overlay) {
+        closeImageViewer();
+    }
+}
+
+closeoverlayBtn.addEventListener("click", closeImageViewer);
 
 // -----------------------------
 // Organelles hover + click names

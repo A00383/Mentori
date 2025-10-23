@@ -1064,19 +1064,30 @@ const overlayImg = document.getElementById("image-viewer-img");
 const closeoverlayBtn = document.getElementById("close-image-viewer");
 
 // Handle clicks on any image
-document.getElementById("image-container").addEventListener("click", (e) => {
-    const img = e.target.closest("img");
-    if (!img) return;
+const imageContainers = [
+    document.getElementById("main-image-images"),
+    document.getElementById("pop-up-image-section-images")
+];
 
-    if (popupimageremoveMode || mainimageremoveMode) {
-        img.remove();
-        popupimageremoveMode = false;
-        mainimageremoveMode = false;
-        return;
-    }
+// Attach listener to each (if it exists)
+imageContainers.forEach(container => {
+    if (!container) return;
 
-    // Otherwise open the viewer
-    openImageViewer(img.src);
+    container.addEventListener("click", (e) => {
+        const img = e.target.closest("img");
+        if (!img) return;
+
+        if (popupimageremoveMode || mainimageremoveMode) {
+            img.remove();
+            popupimageremoveMode = false;
+            mainimageremoveMode = false;
+            return;
+        }
+
+        if (!popupimageremoveMode && !mainimageremoveMode) {
+            openImageViewer(img.src);
+        }
+    });
 });
 
 // Open the image viewer

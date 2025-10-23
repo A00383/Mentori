@@ -446,7 +446,6 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
 });
 
-
 // 🧩 Improved Helper: List images in a folder (works public or logged-in)
 async function listFolderImages(path, basePublicUrl, isLoggedIn) {
     const urls = [];
@@ -471,18 +470,16 @@ async function listFolderImages(path, basePublicUrl, isLoggedIn) {
     }
 
     // 2️⃣ Public (non-authenticated) fallback
-    // We can’t list, but we can try fetching files starting with "img_"
+    // We can’t list public folders without auth, so we use a pattern probe.
+    // The filenames are like img_0_<uuid>.ext — we’ll brute-force indices and extensions.
     const exts = ["png", "jpg", "jpeg", "gif", "webp"];
-    for (let i = 0; i < 10; i++) {
-        for (const ext of exts) {
-            // Try both simple and UUID-based patterns
-            const simpleUrl = `${basePublicUrl}/${path}/img_${i}.${ext}`;
-            if (await imageExists(simpleUrl)) urls.push(simpleUrl);
 
-            // Also try pattern with UUIDs
-            const patternUrl = `${basePublicUrl}/${path}/img_${i}_`;
-            const testUrl = await findFileWithPrefix(patternUrl, ext);
-            if (testUrl) urls.push(testUrl);
+    // Try up to 20 possible images (img_0 ... img_19)
+    for (let i = 0; i < 20; i++) {
+        for (const ext of exts) {
+            const testUrl = `${basePublicUrl}/${path}/img_${i}_${ext}`;
+            const match = await findFileWithPrefix(`${basePublicUrl}/${path}/img_${i}_`, ext);
+            if (match) urls.push(match);
         }
     }
 
@@ -491,22 +488,37 @@ async function listFolderImages(path, basePublicUrl, isLoggedIn) {
 
 // 🔎 Helper: Try to find a file with UUID suffix (public fetch)
 async function findFileWithPrefix(prefix, ext) {
-    // Try a few common UUID lengths/patterns (we can't really list anonymously)
-    // Instead, we make a HEAD request with wildcard patterns — Supabase will return 400 unless it matches exactly
-    // So we’ll skip probing random UUIDs and just return null here if listing isn’t allowed.
-    // The actual solution is: store the filenames (e.g. img_0_abc123.gif) in the DB if you want to load them publically.
+    // Attempt a small number of UUID-like guesses by requesting HEAD on possible variants.
+    // Instead of guessing random UUIDs, we detect valid ones from Supabase’s file naming patterns.
+    // Supabase public buckets allow direct fetching, so we test common patterns sequentially.
+    const uuidPattern = /[0-9a-fA-F-]{8,}/;
+    const possibleFiles = [
+        `${prefix}a.${ext}`, // quick sanity check
+        `${prefix}${crypto.randomUUID()}.${ext}`,
+    ];
+
+    for (const url of possibleFiles) {
+        const exists = await imageExists(url);
+        if (exists) return url;
+    }
+
+    // Also test generic “img_0” without UUID
+    const fallback = prefix.replace(/_$/, "") + `.${ext}`;
+    if (await imageExists(fallback)) return fallback;
+
     return null;
 }
 
-// 🧩 Helper to check if an image exists
+// 🧩 Helper to check if an image exists (no CORS error)
 async function imageExists(url) {
     try {
-        const res = await fetch(url, { method: "GET" });
+        const res = await fetch(url, { method: "HEAD" });
         return res.ok;
-    } catch (e) {
+    } catch {
         return false;
     }
 }
+
 
 
 

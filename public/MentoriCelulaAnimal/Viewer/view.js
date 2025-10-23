@@ -382,11 +382,9 @@ window.addEventListener("DOMContentLoaded", async () => {
         //--------------------------------
         // 1️⃣ Load document content
         //--------------------------------
-        const { data: doc, error: docError } = await supabase
-            .from("documents")
-            .select("content")
-            .eq("id", docId)
-            .maybeSingle();
+        const doc = await loadDocumentById(docId);
+        if (!doc) throw new Error("Documento no encontrado");
+
 
         if (docError) throw docError;
         if (!doc) throw new Error("Documento no encontrado");
@@ -494,9 +492,8 @@ async function imageExists(url) {
 }
 
 
-
 // -----------------------------
-// Helper: Load document by ID
+// Helper: Load document by ID (with safe JSON parsing)
 // -----------------------------
 async function loadDocumentById(id) {
     const { data, error } = await supabase
@@ -506,8 +503,21 @@ async function loadDocumentById(id) {
         .maybeSingle();
 
     if (error) throw error;
+    if (!data) return null;
+
+    // Ensure content is parsed JSON
+    if (typeof data.content === "string") {
+        try {
+            data.content = JSON.parse(data.content);
+        } catch {
+            console.warn("⚠️ Could not parse document content JSON");
+            data.content = {};
+        }
+    }
+
     return data;
 }
+
 
 
 import { nanoid } from "https://cdn.jsdelivr.net/npm/nanoid/nanoid.js";

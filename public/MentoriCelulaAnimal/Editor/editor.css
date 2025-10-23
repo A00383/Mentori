@@ -369,7 +369,6 @@ body {
     display: block;
     max-width: 90vw;
     max-height: 90vh;
-    width: auto;
     height: auto;
     object-fit: contain;
     margin: 0 auto;

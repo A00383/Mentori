@@ -804,7 +804,7 @@ async function waitForOrganeles(timeout = 4000) {
         }
         await new Promise(r => setTimeout(r, 100));
     }
-    console.log("✅ Organeles ready:", document.querySelectorAll(".organelo").length);
+    console.log("✅ Organeles ready:", document.querySelectorAll(".organelos").length);
 }
 
 

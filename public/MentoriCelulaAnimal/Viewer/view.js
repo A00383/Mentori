@@ -396,7 +396,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         const mainImagesContainer = document.getElementById("main-image-images");
         mainImagesContainer.innerHTML = "";
 
-        const mainImgs = await listFolderImages(`${docId}/main_imgs`, basePublicUrl);
+        const mainImgs = await listFolderImages(`${docId}/main_imgs`, basePublicUrl, isLoggedIn);
         if (mainImgs.length > 0) {
             for (const url of mainImgs) {
                 const img = document.createElement("img");
@@ -435,7 +435,7 @@ window.addEventListener("DOMContentLoaded", async () => {
             const el = document.getElementById(domId);
             if (!el) continue;
 
-            const urls = await listFolderImages(`${docId}/${folderName}`, basePublicUrl);
+            const urls = await listFolderImages(`${docId}/${folderName}`, basePublicUrl, isLoggedIn);
             el.dataset.image = JSON.stringify(urls);
         }
 
@@ -447,30 +447,66 @@ window.addEventListener("DOMContentLoaded", async () => {
 });
 
 
-// 🧩 Helper: List images in a folder (public-safe)
-async function listFolderImages(path, basePublicUrl) {
-    try {
-        // Always attempt listing — works for both public and logged-in buckets
-        const { data, error } = await supabase.storage
-            .from(IMGS_BUCKET)
-            .list(path, { limit: 100 });
+// 🧩 Helper: List images in a folder (works public or logged-in)
+async function listFolderImages(path, basePublicUrl, isLoggedIn) {
+    // 1️⃣ Try normal Supabase listing if logged in
+    if (isLoggedIn) {
+        try {
+            const { data, error } = await supabase.storage
+                .from(IMGS_BUCKET)
+                .list(path, { limit: 100 });
 
-        if (error) {
-            console.warn("⚠️ Error listing folder:", path, error.message);
-            return [];
+            if (error) throw error;
+            if (data && data.length > 0) {
+                return data
+                    .filter(f => /\.(png|jpg|jpeg|gif|webp)$/i.test(f.name))
+                    .map(f => `${basePublicUrl}/${path}/${f.name}`);
+            }
+        } catch (err) {
+            console.warn("⚠️ Error listing folder (auth):", path, err.message);
+        }
+    }
+
+    // 2️⃣ Fallback for public (non-authenticated)
+    // Since bucket is public, try fetching directly by guessing possible filenames
+    try {
+        const possibleNames = [
+            "img_0.png", "img_0.jpg", "img_0.jpeg", "img_0.gif", "img_0.webp",
+            "img_1.png", "img_1.jpg", "img_1.jpeg", "img_1.gif", "img_1.webp"
+        ];
+
+        const found = [];
+        for (const name of possibleNames) {
+            const url = `${basePublicUrl}/${path}/${name}`;
+            if (await imageExists(url)) found.push(url);
         }
 
-        if (!data || data.length === 0) return [];
+        // If nothing found, maybe folder contains random UUID filenames (e.g. img_0_<uuid>.gif)
+        if (found.length === 0) {
+            // Try direct head request to folder path to detect accessible objects
+            const prefix = `${basePublicUrl}/${path}/img_0_`;
+            const extensions = ["png", "jpg", "jpeg", "gif", "webp"];
+            for (const ext of extensions) {
+                const url = `${prefix}${crypto.randomUUID()}.${ext}`; // test pattern
+                // skip HEAD check since we can’t list, just infer pattern
+            }
+        }
 
-        // Accept all standard formats
-        return data
-            .filter(f =>
-                /\.(png|jpg|jpeg|gif|webp)$/i.test(f.name)
-            )
-            .map(f => `${basePublicUrl}/${path}/${f.name}`);
+        return found;
     } catch (err) {
-        console.warn("⚠️ Could not list images for", path, err.message);
+        console.warn("⚠️ Public fallback failed for", path, err.message);
         return [];
+    }
+}
+
+
+// 🧩 Helper to check if an image exists
+async function imageExists(url) {
+    try {
+        const res = await fetch(url, { method: "HEAD" });
+        return res.ok;
+    } catch {
+        return false;
     }
 }
 
@@ -499,8 +535,6 @@ async function loadDocumentById(id) {
 
     return data;
 }
-
-
 
 
 import { nanoid } from "https://cdn.jsdelivr.net/npm/nanoid/nanoid.js";

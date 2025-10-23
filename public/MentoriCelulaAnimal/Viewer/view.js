@@ -388,20 +388,32 @@ window.addEventListener("DOMContentLoaded", async () => {
             descriptionInput.value = doc.content.description;
         }
 
-        // --- 2️⃣ Load main images (public) ---
+        // --- 2️⃣ Load main images (public) — using getPublicUrl() for robustness ---
         const mainFolder = `${docId}/main_imgs`;
         const { data: mainFiles, error: mainErr } = await supabase.storage
             .from(IMGS_BUCKET)
             .list(mainFolder, { limit: 100 });
 
-        if (mainErr) console.warn("⚠️ Could not list main images:", mainErr);
-        mainimagesContainer.innerHTML = "";
-
-        for (const file of mainFiles || []) {
-            const img = document.createElement("img");
-            img.src = `${basePublicUrl}/${mainFolder}/${file.name}`;
-            img.classList.add("main-image");
-            mainimagesContainer.appendChild(img);
+        if (mainErr) {
+            console.warn("⚠️ Could not list main images:", mainErr);
+            mainimagesContainer.innerHTML = ""; // keep safe
+        } else {
+            mainimagesContainer.innerHTML = "";
+            for (const file of mainFiles || []) {
+                // build path and ask Supabase for the exact public URL
+                const filePath = `${mainFolder}/${file.name}`;
+                const { data: pub, error: pubErr } = supabase.storage
+                    .from(IMGS_BUCKET)
+                    .getPublicUrl(filePath);
+                if (pubErr || !pub?.publicUrl) {
+                    console.warn("⚠️ getPublicUrl failed for", filePath, pubErr);
+                    continue;
+                }
+                const img = document.createElement("img");
+                img.src = pub.publicUrl;
+                img.classList.add("main-image");
+                mainimagesContainer.appendChild(img);
+            }
         }
 
         // --- 3️⃣ Load organelle text content ---
@@ -422,7 +434,7 @@ window.addEventListener("DOMContentLoaded", async () => {
             }
         }
 
-        // --- 4️⃣ Load organelle images (public) ---
+        // --- 4️⃣ Load organelle images (public) — robustly ask Supabase for URLs ---
         for (const domId in ORGANELLE_COLUMN_MAP) {
             const folderName = domId.replaceAll(" ", "_");
             const folderPath = `${docId}/${folderName}`;
@@ -435,9 +447,18 @@ window.addEventListener("DOMContentLoaded", async () => {
                 continue;
             }
 
-            const urls = (files || []).map(
-                f => `${basePublicUrl}/${folderPath}/${f.name}`
-            );
+            const urls = [];
+            for (const f of (files || [])) {
+                const filePath = `${folderPath}/${f.name}`;
+                const { data: pub, error: pubErr } = supabase.storage
+                    .from(IMGS_BUCKET)
+                    .getPublicUrl(filePath);
+                if (pubErr || !pub?.publicUrl) {
+                    console.warn("⚠️ getPublicUrl failed for", filePath, pubErr);
+                    continue;
+                }
+                urls.push(pub.publicUrl);
+            }
 
             const el = document.getElementById(domId);
             if (el) el.dataset.image = JSON.stringify(urls);

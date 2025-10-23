@@ -501,12 +501,13 @@ async function findFileWithPrefix(prefix, ext) {
 // 🧩 Helper to check if an image exists
 async function imageExists(url) {
     try {
-        const res = await fetch(url, { method: "HEAD" });
+        const res = await fetch(url, { method: "GET" });
         return res.ok;
-    } catch {
+    } catch (e) {
         return false;
     }
 }
+
 
 
 // -----------------------------

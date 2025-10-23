@@ -385,10 +385,6 @@ window.addEventListener("DOMContentLoaded", async () => {
         const doc = await loadDocumentById(docId);
         if (!doc) throw new Error("Documento no encontrado");
 
-
-        if (docError) throw docError;
-        if (!doc) throw new Error("Documento no encontrado");
-
         // Description
         const descriptionInput = document.getElementById("description");
         if (descriptionInput && doc.content?.description) {
@@ -450,6 +446,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         alert("No se pudo cargar el documento: " + err.message);
     }
 });
+
 
 // 🧩 Helper: List images in a folder (authenticated or public-safe)
 async function listFolderImages(path, isLoggedIn, basePublicUrl) {

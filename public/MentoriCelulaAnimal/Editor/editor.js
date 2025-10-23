@@ -835,7 +835,6 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
     if (!documentId) throw new Error("uploadAllImagesForDocument requires a documentId");
 
     console.log("🖼️ Starting smart upload for doc:", documentId);
-
     const uploadedUrls = new Set();
 
     // --- MAIN IMAGES ---
@@ -845,20 +844,19 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
         const src = img.src;
 
         try {
-            // ✅ If image already hosted in Supabase bucket → keep it
-            if (src?.startsWith("http") && src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
+            // ✅ Keep existing Supabase URLs
+            if (src?.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
                 uploadedUrls.add(src);
                 continue;
             }
 
-            // 🆕 Otherwise, upload new image
+            // 🆕 Upload new image
             const blob = await getBlobFromSrc(src);
             const ext = extensionFromMime(blob.type || "image/png");
-            const filename = `main_imgs/img_${i}_${crypto.randomUUID()}.${ext}`;
-            const path = `${documentId}/${filename}`;
+            const path = `${documentId}/main_imgs/img_${i}_${crypto.randomUUID()}.${ext}`;
 
             const publicUrl = await uploadBlobToBucket(IMGS_BUCKET, path, blob);
-            await new Promise(res => setTimeout(res, 200));
+            await new Promise(res => setTimeout(res, 200)); // avoid rate issues
 
             img.src = publicUrl;
             img.dataset.src = publicUrl;
@@ -873,34 +871,29 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
     const organelos = document.querySelectorAll(".organelo");
     for (const organel of organelos) {
         let imgs = [];
-        try {
-            imgs = JSON.parse(organel.dataset.image || "[]");
-        } catch {
-            imgs = [];
-        }
+        try { imgs = JSON.parse(organel.dataset.image || "[]"); } catch {}
 
-        const folderName = organelleFolderName(
-            organel.id || organel.dataset?.organelId || "unknown"
-        );
+        // 🧩 Normalize folder name (safe slug)
+        const folderName = (organel.id || organel.dataset?.organelId || "unknown")
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, "_")
+            .replace(/[^\w_-]/g, "");
 
         const newUrls = [];
 
         for (let i = 0; i < imgs.length; i++) {
             const src = imgs[i];
-
             try {
-                // ✅ Keep already uploaded Supabase URLs
-                if (src?.startsWith("http") && src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
+                if (src?.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
                     newUrls.push(src);
                     uploadedUrls.add(src);
                     continue;
                 }
 
-                // 🆕 Upload new base64 / local images
                 const blob = await getBlobFromSrc(src);
                 const ext = extensionFromMime(blob.type || "image/png");
-                const filename = `${folderName}/img_${i}_${crypto.randomUUID()}.${ext}`;
-                const path = `${documentId}/${filename}`;
+                const path = `${documentId}/${folderName}/img_${i}_${crypto.randomUUID()}.${ext}`;
 
                 const publicUrl = await uploadBlobToBucket(IMGS_BUCKET, path, blob);
                 await new Promise(res => setTimeout(res, 200));
@@ -916,8 +909,7 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
         organel.dataset.image = JSON.stringify(newUrls);
     }
 
-    // --- OPTIONAL CLEANUP ---
-    // (delete orphaned files no longer referenced)
+    // --- CLEANUP ---
     await cleanupUnusedImages(documentId, uploadedUrls);
 
     console.log("✅ Image sync complete");
@@ -925,21 +917,42 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
 }
 
 // ==============================
-// OPTIONAL SAFE CLEANUP
+// SAFE CLEANUP (fixed supabaseUrl)
 // ==============================
 async function cleanupUnusedImages(documentId, keepUrlsSet) {
     try {
-        const { data: list, error } = await supabase.storage
+        const baseUrl = supabase.storageUrl || supabase.supabaseUrl || "";
+        const publicBase = `${baseUrl}/storage/v1/object/public/${IMGS_BUCKET}`;
+
+        const { data: files, error } = await supabase.storage
             .from(IMGS_BUCKET)
             .list(documentId, { limit: 1000 });
 
-        if (error || !list) return;
+        if (error || !files) {
+            console.warn("⚠️ Cleanup list error:", error?.message);
+            return;
+        }
 
-        for (const file of list) {
-            const publicUrl = `${supabaseUrl}/storage/v1/object/public/${IMGS_BUCKET}/${documentId}/${file.name}`;
-            if (!keepUrlsSet.has(publicUrl)) {
-                console.log("🧹 Removing orphaned image:", publicUrl);
-                await supabase.storage.from(IMGS_BUCKET).remove([`${documentId}/${file.name}`]);
+        // Check files in main folder and recurse for subfolders
+        for (const f of files) {
+            if (f.name.includes(".")) {
+                const publicUrl = `${publicBase}/${documentId}/${encodeURIComponent(f.name)}`;
+                if (!keepUrlsSet.has(publicUrl)) {
+                    console.log("🧹 Removing unused file:", f.name);
+                    await supabase.storage.from(IMGS_BUCKET).remove([`${documentId}/${f.name}`]);
+                }
+            } else {
+                const { data: subFiles } = await supabase.storage
+                    .from(IMGS_BUCKET)
+                    .list(`${documentId}/${f.name}`);
+                for (const sf of subFiles || []) {
+                    const fullUrl = `${publicBase}/${documentId}/${f.name}/${encodeURIComponent(sf.name)}`;
+                    if (!keepUrlsSet.has(fullUrl)) {
+                        console.log("🧹 Removing unused subfile:", f.name, sf.name);
+                        await supabase.storage.from(IMGS_BUCKET)
+                            .remove([`${documentId}/${f.name}/${sf.name}`]);
+                    }
+                }
             }
         }
     } catch (err) {

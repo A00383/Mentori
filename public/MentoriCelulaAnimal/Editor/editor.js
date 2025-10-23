@@ -828,34 +828,41 @@ if (saveonlinebutton) {
     });
 }
 
-// -----------------------------
-// Upload all images for a document
-// -----------------------------
+// ==============================
+// SMART IMAGE UPLOADER (idempotent)
+// ==============================
 async function uploadAllImagesForDocument(documentId, editorContent) {
-
     if (!documentId) throw new Error("uploadAllImagesForDocument requires a documentId");
 
-    await clearDocumentImages(documentId);
+    console.log("🖼️ Starting smart upload for doc:", documentId);
+
+    const uploadedUrls = new Set();
 
     // --- MAIN IMAGES ---
     const mainImgs = [...(mainimagesContainer?.querySelectorAll("img") || [])];
     for (let i = 0; i < mainImgs.length; i++) {
-        const src = mainImgs[i].src;
-        try {
-            if (src?.startsWith("http") && src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`))
-                continue;
+        const img = mainImgs[i];
+        const src = img.src;
 
+        try {
+            // ✅ If image already hosted in Supabase bucket → keep it
+            if (src?.startsWith("http") && src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
+                uploadedUrls.add(src);
+                continue;
+            }
+
+            // 🆕 Otherwise, upload new image
             const blob = await getBlobFromSrc(src);
             const ext = extensionFromMime(blob.type || "image/png");
             const filename = `main_imgs/img_${i}_${crypto.randomUUID()}.${ext}`;
-            const path = `${documentId}/${filename}`; // ✅ safe string path
+            const path = `${documentId}/${filename}`;
 
             const publicUrl = await uploadBlobToBucket(IMGS_BUCKET, path, blob);
+            await new Promise(res => setTimeout(res, 200));
 
-            await new Promise(res => setTimeout(res, 300));
-
-            mainImgs[i].src = publicUrl;
-            mainImgs[i].dataset.src = publicUrl;
+            img.src = publicUrl;
+            img.dataset.src = publicUrl;
+            uploadedUrls.add(publicUrl);
 
         } catch (err) {
             console.warn("⚠️ Failed to upload main image:", err);
@@ -863,6 +870,7 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
     }
 
     // --- ORGANELE IMAGES ---
+    const organelos = document.querySelectorAll(".organelo");
     for (const organel of organelos) {
         let imgs = [];
         try {
@@ -874,24 +882,31 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
         const folderName = organelleFolderName(
             organel.id || organel.dataset?.organelId || "unknown"
         );
+
         const newUrls = [];
 
         for (let i = 0; i < imgs.length; i++) {
             const src = imgs[i];
+
             try {
+                // ✅ Keep already uploaded Supabase URLs
                 if (src?.startsWith("http") && src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
                     newUrls.push(src);
+                    uploadedUrls.add(src);
                     continue;
                 }
 
+                // 🆕 Upload new base64 / local images
                 const blob = await getBlobFromSrc(src);
                 const ext = extensionFromMime(blob.type || "image/png");
                 const filename = `${folderName}/img_${i}_${crypto.randomUUID()}.${ext}`;
-                const path = `${documentId}/${filename}`; // ✅ safe path
+                const path = `${documentId}/${filename}`;
 
                 const publicUrl = await uploadBlobToBucket(IMGS_BUCKET, path, blob);
-                await new Promise(res => setTimeout(res, 300));
+                await new Promise(res => setTimeout(res, 200));
+
                 newUrls.push(publicUrl);
+                uploadedUrls.add(publicUrl);
             } catch (err) {
                 console.warn(`⚠️ Failed to upload image for organelle ${folderName}:`, err);
                 if (src) newUrls.push(src);
@@ -901,7 +916,35 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
         organel.dataset.image = JSON.stringify(newUrls);
     }
 
+    // --- OPTIONAL CLEANUP ---
+    // (delete orphaned files no longer referenced)
+    await cleanupUnusedImages(documentId, uploadedUrls);
+
+    console.log("✅ Image sync complete");
     return true;
+}
+
+// ==============================
+// OPTIONAL SAFE CLEANUP
+// ==============================
+async function cleanupUnusedImages(documentId, keepUrlsSet) {
+    try {
+        const { data: list, error } = await supabase.storage
+            .from(IMGS_BUCKET)
+            .list(documentId, { limit: 1000 });
+
+        if (error || !list) return;
+
+        for (const file of list) {
+            const publicUrl = `${supabaseUrl}/storage/v1/object/public/${IMGS_BUCKET}/${documentId}/${file.name}`;
+            if (!keepUrlsSet.has(publicUrl)) {
+                console.log("🧹 Removing orphaned image:", publicUrl);
+                await supabase.storage.from(IMGS_BUCKET).remove([`${documentId}/${file.name}`]);
+            }
+        }
+    } catch (err) {
+        console.warn("⚠️ Cleanup failed:", err);
+    }
 }
 
 // -----------------------------

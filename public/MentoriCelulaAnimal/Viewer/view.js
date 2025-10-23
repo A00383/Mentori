@@ -349,66 +349,78 @@ if (saveonlinebutton) {
 //------------------------------
 // Load Document On Start-up (Completely Public Safe)
 //------------------------------
+
+//------------------------------
+// Load Document On Start-up (Public & Private Safe)
+//------------------------------
 window.addEventListener("DOMContentLoaded", async () => {
-    console.log("🚀 Loading document (public safe)...");
+    console.log("🚀 Loading document...");
 
     const docId = new URLSearchParams(window.location.search).get("id");
-    if (!docId) return console.warn("❌ No document ID found in URL");
-
-    // --- 1️⃣ Load document content from Supabase ---
-    let doc = null;
-    try {
-        const { data, error } = await supabase
-            .from("documents")
-            .select("content")
-            .eq("id", docId)
-            .maybeSingle();
-
-        if (error) throw error;
-        if (!data) throw new Error("Documento no encontrado");
-        doc = data;
-    } catch (err) {
-        console.error("❌ Error fetching document content:", err);
-        alert("No se pudo cargar el documento: " + err.message);
+    if (!docId) {
+        console.warn("❌ No document ID in URL");
         return;
     }
 
-    // --- 2️⃣ Fill in description ---
-    const descriptionInput = document.getElementById("description");
-    if (descriptionInput && doc.content?.description) {
-        descriptionInput.value = doc.content.description;
+    // Restore session silently (optional)
+    try {
+        await supabase.auth.getSession();
+        await renderUser();
+    } catch (err) {
+        console.warn("⚠️ Could not restore session:", err);
     }
 
-    // --- 3️⃣ Derive PUBLIC base URL manually ---
-    // Prevent using supabase.auth or storage.list() for images
+    // Dynamically extract project ref and base URL
     const supabaseUrl = supabase.supabaseUrl || supabase.storageUrl || supabase.rest?.url;
     const projectMatch = supabaseUrl?.match(/https:\/\/([a-z0-9-]+)\.supabase\.co/i);
     const projectRef = projectMatch ? projectMatch[1] : "unknown";
     const basePublicUrl = `https://${projectRef}.supabase.co/storage/v1/object/public/${IMGS_BUCKET}`;
 
-    // --- 4️⃣ Fetch main images manually from public folder listing API ---
     try {
-        const listUrl = `${supabaseUrl}/storage/v1/object/list/${IMGS_BUCKET}?prefix=${docId}/main_imgs/`;
-        const res = await fetch(listUrl, {
-            headers: { apikey: supabase.supabaseKey },
-        });
-        const files = await res.json();
+        // --- Load document content ---
+        const { data: doc, error: docError } = await supabase
+            .from("documents")
+            .select("content")
+            .eq("id", docId)
+            .maybeSingle();
 
+        if (docError) throw docError;
+        if (!doc) throw new Error("Documento no encontrado");
+
+        // Description
+        const descriptionInput = document.getElementById("description");
+        if (descriptionInput && doc.content?.description) {
+            descriptionInput.value = doc.content.description;
+        }
+
+        // --- Load main images (public URL method) ---
         const mainimagesContainer = document.getElementById("main-image-images");
         mainimagesContainer.innerHTML = "";
 
-        for (const file of files || []) {
-            const img = document.createElement("img");
-            img.src = `${basePublicUrl}/${docId}/main_imgs/${file.name}`;
-            img.classList.add("main-image");
-            mainimagesContainer.appendChild(img);
+        // We'll assume image filenames are in the stored dataset if possible
+        const possibleImgs = doc.content?.mainImages || [];
+        if (possibleImgs.length) {
+            possibleImgs.forEach(src => {
+                const img = document.createElement("img");
+                img.src = src;
+                img.classList.add("main-image");
+                mainimagesContainer.appendChild(img);
+            });
+        } else {
+            // If not stored, try to load numbered fallbacks (img_0, img_1, etc.)
+            for (let i = 0; i < 10; i++) {
+                const url = `${basePublicUrl}/${docId}/main_imgs/img_${i}.png`;
+                const exists = await imageExists(url);
+                if (exists) {
+                    const img = document.createElement("img");
+                    img.src = url;
+                    img.classList.add("main-image");
+                    mainimagesContainer.appendChild(img);
+                }
+            }
         }
-    } catch (err) {
-        console.warn("⚠️ Could not load main images:", err);
-    }
 
-    // --- 5️⃣ Load organelles and their images ---
-    try {
+        // --- Load organelle text and image data ---
         const { data: organelles, error: orgErr } = await supabase
             .from("organelles")
             .select("*")
@@ -416,7 +428,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
         if (orgErr) throw orgErr;
 
-        // Set text content
+        // Text content
         if (organelles && organelles.length === 1) {
             const orgRow = organelles[0];
             for (const domId in ORGANELLE_COLUMN_MAP) {
@@ -426,29 +438,38 @@ window.addEventListener("DOMContentLoaded", async () => {
             }
         }
 
-        // Load images manually for each organelle
+        // Image loading for each organelle
         for (const domId in ORGANELLE_COLUMN_MAP) {
             const folderName = domId.replaceAll(" ", "_");
-            const listUrl = `${supabaseUrl}/storage/v1/object/list/${IMGS_BUCKET}?prefix=${docId}/${folderName}/`;
-
-            const res = await fetch(listUrl, {
-                headers: { apikey: supabase.supabaseKey },
-            });
-            const files = await res.json();
-
-            const urls = (files || []).map(
-                f => `${basePublicUrl}/${docId}/${folderName}/${f.name}`
-            );
-
             const el = document.getElementById(domId);
-            if (el) el.dataset.image = JSON.stringify(urls);
+            if (!el) continue;
+
+            const urls = [];
+            for (let i = 0; i < 10; i++) {
+                const url = `${basePublicUrl}/${docId}/${folderName}/img_${i}.png`;
+                const exists = await imageExists(url);
+                if (exists) urls.push(url);
+            }
+
+            el.dataset.image = JSON.stringify(urls);
         }
 
-        console.log("✅ Document loaded (public URLs used, no auth required)");
+        console.log("✅ Document loaded successfully (fully public-safe)");
     } catch (err) {
-        console.error("❌ Error loading organelles:", err);
+        console.error("❌ Error loading document:", err);
+        alert("No se pudo cargar el documento: " + err.message);
     }
 });
+
+// 🧩 Helper to check if an image exists without throwing CORS errors
+async function imageExists(url) {
+    try {
+        const res = await fetch(url, { method: "HEAD" });
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
 
 
 // -----------------------------

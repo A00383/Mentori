@@ -509,18 +509,6 @@ async function imageExists(url) {
 }
 
 
-
-// 🧩 Helper to check if an image exists
-async function imageExists(url) {
-    try {
-        const res = await fetch(url, { method: "HEAD" });
-        return res.ok;
-    } catch {
-        return false;
-    }
-}
-
-
 // -----------------------------
 // Helper: Load document by ID (safe JSON parsing)
 // -----------------------------

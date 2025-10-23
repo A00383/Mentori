@@ -775,12 +775,6 @@ if (copyBtn) {
             if (insertErr) throw insertErr;
             const newId = newDoc.id;
 
-            // 4️⃣ (Optional) Increment the counter in the original document
-            await supabase
-                .from("documents")
-                .update({ copy_counter: newCounter })
-                .eq("id", oldId);
-
             // 5️⃣ Copy all images
             await copyDocumentImages(oldId, newId);
 

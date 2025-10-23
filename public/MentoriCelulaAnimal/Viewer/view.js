@@ -288,6 +288,55 @@ if (savebtn) {
     });
 }
 
+const overlay = document.getElementById("image-viewer-overlay");
+const overlayImg = document.getElementById("image-viewer-img");
+const closeoverlayBtn = document.getElementById("close-image-viewer");
+
+// Handle clicks on any image
+const imageContainers = [
+    document.getElementById("main-image-images"),
+    document.getElementById("pop-up-image-section-images")
+];
+
+// Attach listener to each (if it exists)
+imageContainers.forEach(container => {
+    if (!container) return;
+
+    container.addEventListener("click", (e) => {
+        const img = e.target.closest("img");
+        if (!img) return;
+
+        else {
+            openImageViewer(img.src);
+        }
+    });
+});
+
+// Open the image viewer
+function openImageViewer(src) {
+    overlayImg.src = src;
+    overlay.classList.remove("hidden");
+
+    // prevent clicks from closing other popups
+    overlay.addEventListener("click", handleOverlayClick);
+}
+
+// Close viewer
+function closeImageViewer() {
+    overlay.classList.add("hidden");
+    overlayImg.src = "";
+    overlay.removeEventListener("click", handleOverlayClick);
+}
+
+// Click outside image closes viewer
+function handleOverlayClick(e) {
+    if (e.target === overlay) {
+        closeImageViewer();
+    }
+}
+
+closeoverlayBtn.addEventListener("click", closeImageViewer);
+
 // -----------------------------
 // Supabase Online Save (disabled in Viewer)
 // -----------------------------

@@ -999,51 +999,84 @@ async function cleanupUnusedImages(documentId, keepPathsSet) {
 }
 
 // -----------------------------
-// Organelles table upsert (with image sync)
+// Organelles table upsert + image sync
 // -----------------------------
 async function upsertOrganellesText(documentId, editorContent) {
-    const user = await getCurrentUser();
-    if (!user) throw new Error("Must be logged-in to write organelle text");
+    console.log("🧬 Starting organelle save for:", documentId);
 
+    const user = await getCurrentUser();
+    if (!user) throw new Error("Must be logged-in to save organelles");
+
+    // Ensure table payload base
     const payload = {
         id: `${documentId}-organelles`,
         document_id: documentId,
         creator: user.email,
     };
 
-    // ✅ Include both text and images
+    // Go through each organelle element
     for (const domId in ORGANELLE_COLUMN_MAP) {
         const colName = ORGANELLE_COLUMN_MAP[domId];
         const el = document.getElementById(domId);
+        if (!el) continue;
 
-        // Get the main text (content)
-        const content = el?.dataset?.content ?? "";
+        const dataContent = el.dataset?.content ?? "";
+        payload[colName] = dataContent;
 
-        // Get associated image URLs (after uploadAllImagesForDocument)
-        let images = [];
-        try {
-            images = JSON.parse(el?.dataset?.image || "[]");
-        } catch {
-            images = [];
+        // Check for image inside organelle
+        const img = el.querySelector("img");
+        if (img && img.src && img.src.startsWith("data:")) {
+            // Create folder path for organelle
+            const folderPath = `${IMGS_BUCKET}/${documentId}/${domId}`;
+            const imgName = `img_0_${crypto.randomUUID()}.gif`; // keep consistent naming
+
+            console.log(`🧫 Uploading organelle image for ${domId}: ${imgName}`);
+
+            const { data, error } = await supabase.storage
+                .from(IMGS_BUCKET)
+                .upload(`${documentId}/${domId}/${imgName}`, dataURLtoBlob(img.src), {
+                    upsert: true,
+                    cacheControl: "3600",
+                });
+
+            if (error) {
+                console.error(`❌ Error uploading organelle image for ${domId}`, error);
+                continue;
+            }
+
+            // Generate public URL
+            const { data: publicUrlData } = supabase.storage
+                .from(IMGS_BUCKET)
+                .getPublicUrl(`${documentId}/${domId}/${imgName}`);
+
+            const publicUrl = publicUrlData.publicUrl;
+            payload[`${colName}_img`] = publicUrl; // e.g., aparato_de_golgi_img column
+            console.log(`✅ Uploaded organelle ${domId} image:`, publicUrl);
         }
-
-        // Store both content and images together
-        payload[colName] = {
-            content,
-            images,
-        };
     }
 
-    // ✅ Upsert the full payload
+    console.log("📤 Final organelle payload:", payload);
+
+    // Save / update in Supabase table
     const { error } = await supabase
         .from("organelles")
         .upsert(payload, { onConflict: "document_id" });
 
     if (error) throw error;
-
-    console.log("🧬 Organelles saved:", payload);
+    console.log("✅ Organelles saved successfully to table.");
     return true;
 }
+
+// Helper to convert dataURL → Blob for upload
+function dataURLtoBlob(dataURL) {
+    const [meta, base64] = dataURL.split(",");
+    const mime = meta.match(/:(.*?);/)[1];
+    const binary = atob(base64);
+    const array = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
+    return new Blob([array], { type: mime });
+}
+
 
 // -----------------------------
 // Load local .txt dataset

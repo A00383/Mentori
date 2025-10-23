@@ -881,115 +881,182 @@ if (saveonlinebutton) {
 
 
 // ==============================
-// SMART IMAGE UPLOADER (fixed cleanup logic)
+// UNIFIED SMART IMAGE UPLOADER
 // ==============================
 async function uploadAllImagesForDocument(documentId, editorContent) {
     if (!documentId) throw new Error("uploadAllImagesForDocument requires a documentId");
-    console.log("🖼️ Starting smart upload for doc:", documentId);
 
-    const uploadedPaths = new Set(); // ✅ track paths instead of URLs
+    console.log("🖼️ Starting unified upload for document:", documentId);
+    const uploadedUrls = new Set();
 
-    // --- MAIN IMAGES ---
-    const mainImgs = [...(mainimagesContainer?.querySelectorAll("img") || [])];
+    // Helper: Convert dataURL → Blob
+    function dataURLtoBlob(dataURL) {
+        const [meta, base64] = dataURL.split(",");
+        const mime = meta.match(/:(.*?);/)[1];
+        const binary = atob(base64);
+        const array = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
+        return new Blob([array], { type: mime });
+    }
+
+    // Helper: Get file extension from MIME
+    function extensionFromMime(mime) {
+        const map = {
+            "image/jpeg": "jpg",
+            "image/png": "png",
+            "image/gif": "gif",
+            "image/webp": "webp",
+        };
+        return map[mime] || "png";
+    }
+
+    // ----------------------------------
+    // 🧩 Upload Main Images
+    // ----------------------------------
+    const mainImgs = [...(document.querySelectorAll("#mainimages img") || [])];
+    console.log(`📦 Found ${mainImgs.length} main images.`);
+
     for (let i = 0; i < mainImgs.length; i++) {
         const img = mainImgs[i];
         const src = img.src;
+        if (!src) continue;
+
         try {
-            if (src?.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
-                // Extract relative path from full URL
-                const relPath = src.split(`/storage/v1/object/public/${IMGS_BUCKET}/`)[1];
-                uploadedPaths.add(relPath);
+            // ✅ Skip if already uploaded
+            if (src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
+                uploadedUrls.add(src);
                 continue;
             }
 
-            const blob = await getBlobFromSrc(src);
-            const ext = extensionFromMime(blob.type || "image/png");
-            const path = `${documentId}/main_imgs/img_${i}_${crypto.randomUUID()}.${ext}`;
-            await uploadBlobToBucket(IMGS_BUCKET, path, blob);
-            uploadedPaths.add(path);
+            // 🆕 Upload base64 or blob URLs
+            if (src.startsWith("data:")) {
+                const blob = dataURLtoBlob(src);
+                const ext = extensionFromMime(blob.type);
+                const path = `${documentId}/main_imgs/img_${i}_${crypto.randomUUID()}.${ext}`;
+                console.log("🪣 Uploading", path);
+
+                const { error } = await supabase.storage
+                    .from(IMGS_BUCKET)
+                    .upload(path, blob, { upsert: true });
+
+                if (error) throw error;
+
+                const { data } = supabase.storage
+                    .from(IMGS_BUCKET)
+                    .getPublicUrl(path);
+                const publicUrl = data.publicUrl;
+
+                img.src = publicUrl;
+                img.dataset.src = publicUrl;
+                uploadedUrls.add(publicUrl);
+                console.log("✅ Uploaded main image:", publicUrl);
+                await new Promise(r => setTimeout(r, 150));
+            }
         } catch (err) {
-            console.warn("⚠️ Failed to upload main image:", err);
+            console.error("⚠️ Failed to upload main image:", err);
         }
     }
 
-// --- ORGANELE IMAGES ---
-    const organelos = document.querySelectorAll(".organelo");
-    console.log("Found organelles:", organelos.length);
+    // ----------------------------------
+    // 🔬 Upload Organelle Images
+    // ----------------------------------
+    const organelles = [...document.querySelectorAll(".organelo")];
+    console.log(`🧬 Found ${organelles.length} organelles to process.`);
 
-    for (const organel of organelos) {
-        let imgs = [];
-        try { imgs = JSON.parse(organel.dataset.image || "[]"); } catch {}
-        if (imgs.length === 0) {
-            imgs = [...organel.querySelectorAll("img")].map(i => i.src);
-        }
-
-        const folderName = (organel.id || organel.dataset?.organelId || "unknown")
+    for (const organel of organelles) {
+        const folderName = (organel.id || organel.dataset.organelId || "unknown")
             .trim()
             .toLowerCase()
             .replace(/\s+/g, "_")
             .replace(/[^\w_-]/g, "");
 
-        const newUrls = [];
+        let imgs = [];
+        try {
+            imgs = JSON.parse(organel.dataset.image || "[]");
+        } catch {
+            imgs = [];
+        }
 
+        const newUrls = [];
         for (let i = 0; i < imgs.length; i++) {
             const src = imgs[i];
+            if (!src) continue;
+
             try {
-                if (src?.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
-                    const relPath = src.split(`/storage/v1/object/public/${IMGS_BUCKET}/`)[1];
-                    uploadedPaths.add(relPath);
+                // ✅ Skip if already uploaded
+                if (src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
                     newUrls.push(src);
+                    uploadedUrls.add(src);
                     continue;
                 }
 
-                const blob = await getBlobFromSrc(src);
-                const ext = extensionFromMime(blob.type || "image/png");
-                const path = `${documentId}/${folderName}/img_${i}_${crypto.randomUUID()}.${ext}`;
-                const publicUrl = await uploadBlobToBucket(IMGS_BUCKET, path, blob);
+                // 🆕 Upload new base64 image
+                if (src.startsWith("data:")) {
+                    const blob = dataURLtoBlob(src);
+                    const ext = extensionFromMime(blob.type);
+                    const path = `${documentId}/${folderName}/img_${i}_${crypto.randomUUID()}.${ext}`;
+                    console.log("🧪 Uploading organelle image:", path);
 
-                uploadedPaths.add(path);
-                newUrls.push(publicUrl);
+                    const { error } = await supabase.storage
+                        .from(IMGS_BUCKET)
+                        .upload(path, blob, { upsert: true });
+                    if (error) throw error;
+
+                    const { data } = supabase.storage
+                        .from(IMGS_BUCKET)
+                        .getPublicUrl(path);
+                    const publicUrl = data.publicUrl;
+
+                    newUrls.push(publicUrl);
+                    uploadedUrls.add(publicUrl);
+                    console.log("✅ Uploaded organelle image:", publicUrl);
+                    await new Promise(r => setTimeout(r, 150));
+                }
             } catch (err) {
-                console.warn(`⚠️ Failed to upload image for organelle ${folderName}:`, err);
+                console.error(`⚠️ Failed to upload image for ${folderName}:`, err);
                 if (src) newUrls.push(src);
             }
         }
 
+        // Update organelle dataset with new URLs
         organel.dataset.image = JSON.stringify(newUrls);
     }
 
-    await cleanupUnusedImages(documentId, uploadedPaths);
-
-    console.log("✅ Image sync complete");
-    return true;
-}
-
-// ==============================
-// SAFE CLEANUP BY PATH
-// ==============================
-async function cleanupUnusedImages(documentId, keepPathsSet) {
+    // ----------------------------------
+    // 🧹 Cleanup unused files
+    // ----------------------------------
     try {
-        const { data: list, error } = await supabase.storage
+        const baseUrl = supabase.storageUrl || supabase.supabaseUrl || "";
+        const publicBase = `${baseUrl}/storage/v1/object/public/${IMGS_BUCKET}`;
+        const { data: files, error } = await supabase.storage
             .from(IMGS_BUCKET)
             .list(documentId, { limit: 1000 });
 
-        if (error || !list) return;
+        if (error) {
+            console.warn("⚠️ Cleanup list error:", error.message);
+        } else {
+            for (const f of files) {
+                if (!f.name) continue;
 
-        for (const f of list) {
-            if (f.name.includes(".")) {
-                const path = `${documentId}/${f.name}`;
-                if (!keepPathsSet.has(path)) {
-                    console.log("🧹 Removing unused file:", path);
-                    await supabase.storage.from(IMGS_BUCKET).remove([path]);
-                }
-            } else {
-                const { data: subFiles } = await supabase.storage
-                    .from(IMGS_BUCKET)
-                    .list(`${documentId}/${f.name}`);
-                for (const sf of subFiles || []) {
-                    const subPath = `${documentId}/${f.name}/${sf.name}`;
-                    if (!keepPathsSet.has(subPath)) {
-                        console.log("🧹 Removing unused subfile:", subPath);
-                        await supabase.storage.from(IMGS_BUCKET).remove([subPath]);
+                if (f.name.includes(".")) {
+                    const url = `${publicBase}/${documentId}/${encodeURIComponent(f.name)}`;
+                    if (!uploadedUrls.has(url)) {
+                        console.log("🧹 Removing unused file:", f.name);
+                        await supabase.storage.from(IMGS_BUCKET)
+                            .remove([`${documentId}/${f.name}`]);
+                    }
+                } else {
+                    // Subfolder
+                    const { data: subFiles } = await supabase.storage
+                        .from(IMGS_BUCKET)
+                        .list(`${documentId}/${f.name}`);
+                    for (const sf of subFiles || []) {
+                        const url = `${publicBase}/${documentId}/${f.name}/${encodeURIComponent(sf.name)}`;
+                        if (!uploadedUrls.has(url)) {
+                            console.log("🧹 Removing unused subfile:", f.name, sf.name);
+                            await supabase.storage.from(IMGS_BUCKET)
+                                .remove([`${documentId}/${f.name}/${sf.name}`]);
+                        }
                     }
                 }
             }
@@ -997,7 +1064,11 @@ async function cleanupUnusedImages(documentId, keepPathsSet) {
     } catch (err) {
         console.warn("⚠️ Cleanup failed:", err);
     }
+
+    console.log("✅ All images (main + organelles) synced successfully.");
+    return true;
 }
+
 
 // -----------------------------
 // Organelles table upsert + image sync

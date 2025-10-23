@@ -359,7 +359,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         return;
     }
 
-    // Attempt to restore user session (for logged users)
+    // Try restoring user session (if logged)
     let session = null;
     try {
         const { data } = await supabase.auth.getSession();
@@ -399,12 +399,12 @@ window.addEventListener("DOMContentLoaded", async () => {
         const mainImagesContainer = document.getElementById("main-image-images");
         mainImagesContainer.innerHTML = "";
 
-        const mainImgs = await listFolderImages(`${docId}/main_imgs`, basePublicUrl);
+        const mainImgs = await listImagesFromFolder(`${docId}/main_imgs`);
         if (mainImgs.length > 0) {
             console.log(`🖼️ Found ${mainImgs.length} main images`);
             for (const url of mainImgs) {
                 const img = document.createElement("img");
-                img.src = url;
+                img.src = `${basePublicUrl}/${url}`;
                 img.classList.add("main-image");
                 mainImagesContainer.appendChild(img);
             }
@@ -413,7 +413,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         }
 
         // ------------------------------
-        // 3️⃣ Load organelle text data
+        // 3️⃣ Load organelle text
         // ------------------------------
         const { data: organelles, error: orgErr } = await supabase
             .from("organelles")
@@ -433,20 +433,22 @@ window.addEventListener("DOMContentLoaded", async () => {
         }
 
         // ------------------------------
-        // 4️⃣ Load organelle images (folders)
+        // 4️⃣ Load organelle images
         // ------------------------------
         for (const domId in ORGANELLE_COLUMN_MAP) {
             const folderName = domId.replaceAll(" ", "_").toLowerCase();
             const el = document.getElementById(domId);
             if (!el) continue;
 
-            const urls = await listFolderImages(`${docId}/${folderName}`, basePublicUrl);
-            el.dataset.image = JSON.stringify(urls);
-
-            if (urls.length > 0) {
-                console.log(`🧫 ${folderName}: ${urls.length} image(s)`);
+            const organelleImgs = await listImagesFromFolder(`${docId}/${folderName}`);
+            if (organelleImgs.length > 0) {
+                console.log(`🧫 ${folderName}: ${organelleImgs.length} image(s)`);
+                el.dataset.image = JSON.stringify(
+                    organelleImgs.map(f => `${basePublicUrl}/${f}`)
+                );
             } else {
                 console.log(`⚪ ${folderName}: no images found`);
+                el.dataset.image = "[]";
             }
         }
 
@@ -457,56 +459,33 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
 });
 
+
 // ------------------------------
-// PUBLIC IMAGE LISTING
+// Helper: List all images from a folder (using Supabase Storage API)
 // ------------------------------
-async function listFolderImages(path, basePublicUrl) {
-    const urls = [];
-    const exts = ["png", "jpg", "jpeg", "gif", "webp"];
-
-    // Try up to 15 images named like img_0.png, img_1.png, etc.
-    for (let i = 0; i < 15; i++) {
-        for (const ext of exts) {
-            const simpleUrl = `${basePublicUrl}/${path}/img_${i}.${ext}`;
-            if (await imageExists(simpleUrl)) {
-                urls.push(simpleUrl);
-                continue;
-            }
-
-            // Also try UUID-based pattern (img_0_abc123.gif)
-            const patternPrefix = `${basePublicUrl}/${path}/img_${i}_`;
-            const foundUrl = await findExistingVariant(patternPrefix, ext);
-            if (foundUrl) urls.push(foundUrl);
-        }
-    }
-
-    return urls;
-}
-
-// Try to detect actual UUID-based file names
-async function findExistingVariant(prefix, ext) {
-    // We can’t list, but we can probe likely URLs (based on sample you showed)
-    // Example: prefix = "…/img_0_", ext = "gif"
-    const guessSuffixes = [
-        "f9f2caa0-e562-4707-b361-24690fbd53ff", // sample from your data
-    ];
-    for (const s of guessSuffixes) {
-        const url = `${prefix}${s}.${ext}`;
-        if (await imageExists(url)) return url;
-    }
-    return null;
-}
-
-// Check if image exists
-async function imageExists(url) {
+async function listImagesFromFolder(path) {
     try {
-        const res = await fetch(url, { method: "HEAD" });
-        return res.ok;
-    } catch {
-        return false;
+        const { data, error } = await supabase.storage
+            .from(IMGS_BUCKET)
+            .list(path, { limit: 100 });
+
+        if (error) {
+            console.warn(`⚠️ Could not list images for ${path}:`, error);
+            return [];
+        }
+
+        // Return files with image extensions
+        return data
+            .filter(
+                f =>
+                    f.name.match(/\.(png|jpg|jpeg|gif|webp)$/i)
+            )
+            .map(f => `${path}/${f.name}`);
+    } catch (err) {
+        console.error(`❌ listImagesFromFolder error for ${path}:`, err);
+        return [];
     }
 }
-
 
 
 // -----------------------------

@@ -829,39 +829,32 @@ if (saveonlinebutton) {
 }
 
 // ==============================
-// SMART IMAGE UPLOADER (idempotent)
+// SMART IMAGE UPLOADER (fixed cleanup logic)
 // ==============================
 async function uploadAllImagesForDocument(documentId, editorContent) {
     if (!documentId) throw new Error("uploadAllImagesForDocument requires a documentId");
-
     console.log("🖼️ Starting smart upload for doc:", documentId);
-    const uploadedUrls = new Set();
+
+    const uploadedPaths = new Set(); // ✅ track paths instead of URLs
 
     // --- MAIN IMAGES ---
     const mainImgs = [...(mainimagesContainer?.querySelectorAll("img") || [])];
     for (let i = 0; i < mainImgs.length; i++) {
         const img = mainImgs[i];
         const src = img.src;
-
         try {
-            // ✅ Keep existing Supabase URLs
             if (src?.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
-                uploadedUrls.add(src);
+                // Extract relative path from full URL
+                const relPath = src.split(`/storage/v1/object/public/${IMGS_BUCKET}/`)[1];
+                uploadedPaths.add(relPath);
                 continue;
             }
 
-            // 🆕 Upload new image
             const blob = await getBlobFromSrc(src);
             const ext = extensionFromMime(blob.type || "image/png");
             const path = `${documentId}/main_imgs/img_${i}_${crypto.randomUUID()}.${ext}`;
-
-            const publicUrl = await uploadBlobToBucket(IMGS_BUCKET, path, blob);
-            await new Promise(res => setTimeout(res, 200)); // avoid rate issues
-
-            img.src = publicUrl;
-            img.dataset.src = publicUrl;
-            uploadedUrls.add(publicUrl);
-
+            await uploadBlobToBucket(IMGS_BUCKET, path, blob);
+            uploadedPaths.add(path);
         } catch (err) {
             console.warn("⚠️ Failed to upload main image:", err);
         }
@@ -873,7 +866,6 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
         let imgs = [];
         try { imgs = JSON.parse(organel.dataset.image || "[]"); } catch {}
 
-        // 🧩 Normalize folder name (safe slug)
         const folderName = (organel.id || organel.dataset?.organelId || "unknown")
             .trim()
             .toLowerCase()
@@ -881,25 +873,22 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
             .replace(/[^\w_-]/g, "");
 
         const newUrls = [];
-
         for (let i = 0; i < imgs.length; i++) {
             const src = imgs[i];
             try {
                 if (src?.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
+                    const relPath = src.split(`/storage/v1/object/public/${IMGS_BUCKET}/`)[1];
+                    uploadedPaths.add(relPath);
                     newUrls.push(src);
-                    uploadedUrls.add(src);
                     continue;
                 }
 
                 const blob = await getBlobFromSrc(src);
                 const ext = extensionFromMime(blob.type || "image/png");
                 const path = `${documentId}/${folderName}/img_${i}_${crypto.randomUUID()}.${ext}`;
-
                 const publicUrl = await uploadBlobToBucket(IMGS_BUCKET, path, blob);
-                await new Promise(res => setTimeout(res, 200));
-
+                uploadedPaths.add(path);
                 newUrls.push(publicUrl);
-                uploadedUrls.add(publicUrl);
             } catch (err) {
                 console.warn(`⚠️ Failed to upload image for organelle ${folderName}:`, err);
                 if (src) newUrls.push(src);
@@ -909,48 +898,39 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
         organel.dataset.image = JSON.stringify(newUrls);
     }
 
-    // --- CLEANUP ---
-    await cleanupUnusedImages(documentId, uploadedUrls);
+    await cleanupUnusedImages(documentId, uploadedPaths);
 
     console.log("✅ Image sync complete");
     return true;
 }
 
 // ==============================
-// SAFE CLEANUP (fixed supabaseUrl)
+// SAFE CLEANUP BY PATH
 // ==============================
-async function cleanupUnusedImages(documentId, keepUrlsSet) {
+async function cleanupUnusedImages(documentId, keepPathsSet) {
     try {
-        const baseUrl = supabase.storageUrl || supabase.supabaseUrl || "";
-        const publicBase = `${baseUrl}/storage/v1/object/public/${IMGS_BUCKET}`;
-
-        const { data: files, error } = await supabase.storage
+        const { data: list, error } = await supabase.storage
             .from(IMGS_BUCKET)
             .list(documentId, { limit: 1000 });
 
-        if (error || !files) {
-            console.warn("⚠️ Cleanup list error:", error?.message);
-            return;
-        }
+        if (error || !list) return;
 
-        // Check files in main folder and recurse for subfolders
-        for (const f of files) {
+        for (const f of list) {
             if (f.name.includes(".")) {
-                const publicUrl = `${publicBase}/${documentId}/${encodeURIComponent(f.name)}`;
-                if (!keepUrlsSet.has(publicUrl)) {
-                    console.log("🧹 Removing unused file:", f.name);
-                    await supabase.storage.from(IMGS_BUCKET).remove([`${documentId}/${f.name}`]);
+                const path = `${documentId}/${f.name}`;
+                if (!keepPathsSet.has(path)) {
+                    console.log("🧹 Removing unused file:", path);
+                    await supabase.storage.from(IMGS_BUCKET).remove([path]);
                 }
             } else {
                 const { data: subFiles } = await supabase.storage
                     .from(IMGS_BUCKET)
                     .list(`${documentId}/${f.name}`);
                 for (const sf of subFiles || []) {
-                    const fullUrl = `${publicBase}/${documentId}/${f.name}/${encodeURIComponent(sf.name)}`;
-                    if (!keepUrlsSet.has(fullUrl)) {
-                        console.log("🧹 Removing unused subfile:", f.name, sf.name);
-                        await supabase.storage.from(IMGS_BUCKET)
-                            .remove([`${documentId}/${f.name}/${sf.name}`]);
+                    const subPath = `${documentId}/${f.name}/${sf.name}`;
+                    if (!keepPathsSet.has(subPath)) {
+                        console.log("🧹 Removing unused subfile:", subPath);
+                        await supabase.storage.from(IMGS_BUCKET).remove([subPath]);
                     }
                 }
             }

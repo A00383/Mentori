@@ -442,6 +442,7 @@ if (copyBtn) {
                 .insert([{
                     id: newId,
                     creator: user.email,
+                    owner_id: user.id,
                     content: newContent
                 }])
                 .select()

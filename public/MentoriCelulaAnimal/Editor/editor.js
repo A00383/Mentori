@@ -1076,55 +1076,53 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
 
 
 // -----------------------------
-// ORGANELES TABLE UPSERT (does text + uses dataset.image produced above)
+// ORGANELES TABLE UPSERT (TEXT ONLY)
 // -----------------------------
 async function upsertOrganellesText(documentId, editorContent) {
-    console.log("🧬 Starting organelle save for:", documentId);
+    console.log("🧬 Starting organelle text save for:", documentId);
 
     const user = await getCurrentUser();
     if (!user) throw new Error("Must be logged-in to save organelles");
 
+    // Base payload
     const payload = {
         id: `${documentId}-organelles`,
         document_id: documentId,
         creator: user.email,
     };
 
+    // Go through each organelle mapping (TEXT ONLY)
     for (const domId in ORGANELLE_COLUMN_MAP) {
         const colName = ORGANELLE_COLUMN_MAP[domId];
         const el = document.getElementById(domId);
+
         if (!el) {
+            console.warn(`⚠️ Missing organelle element: ${domId}`);
             payload[colName] = "";
             continue;
         }
 
-        // text
-        payload[colName] = el.dataset?.content ?? "";
+        // Get the text content for that organelle
+        const textContent = el.dataset?.content ?? "";
 
-        // images: store array of public urls (if any) as JSON string or leave empty array
-        try {
-            const imgs = JSON.parse(el.dataset.image || "[]");
-            // If you want to store the array in a separate column, add payload[`${colName}_images`] = imgs
-            // For now we won't create new DB columns; keep image info on dataset if needed
-            payload[`${colName}_image_urls`] = JSON.stringify(imgs || []);
-        } catch {
-            payload[`${colName}_image_urls`] = JSON.stringify([]);
-        }
+        payload[colName] = textContent;
+        console.log(`🧬 Added text for ${domId}: ${textContent.substring(0, 50)}...`);
     }
 
-    // upsert into organelles table using document_id as unique constraint
+    // Save / update in Supabase
     const { error } = await supabase
         .from("organelles")
         .upsert(payload, { onConflict: "document_id" });
 
     if (error) {
-        console.error("❌ upsertOrganellesText failed:", error);
+        console.error("❌ Failed to save organelle text:", error);
         throw error;
     }
 
-    console.log("✅ Organelles saved successfully to table.");
+    console.log("✅ Organelles text saved successfully.");
     return true;
 }
+
 
 // -----------------------------
 // Load local .txt dataset

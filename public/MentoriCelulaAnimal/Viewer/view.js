@@ -443,7 +443,8 @@ if (copyBtn) {
                     id: newId,
                     creator: user.email,
                     owner_id: user.id,
-                    content: newContent
+                    content: newContent,
+                    copy_counter: (originalDoc.copy_counter || 0) + 1,
                 }])
                 .select()
                 .maybeSingle();

@@ -752,18 +752,52 @@ if (copyBtn) {
         const oldId = new URLSearchParams(window.location.search).get("id");
 
         try {
-            const newId = await createDocument(content);
+            // 1️⃣ Fetch the original document to read its copy_counter
+            const { data: originalDoc, error: loadErr } = await supabase
+                .from("documents")
+                .select("id, copy_counter")
+                .eq("id", oldId)
+                .maybeSingle();
 
-            // 🧩 Copy all images
+            if (loadErr) throw loadErr;
+            if (!originalDoc) throw new Error("Documento original no encontrado");
+
+            // 2️⃣ Increment the counter for the *new copy*
+            const newCounter = (originalDoc.copy_counter || 0) + 1;
+
+            // 3️⃣ Create the new document (and include counter + owner info)
+            const { data: newDoc, error: insertErr } = await supabase
+                .from("documents")
+                .insert([{
+                    id: nanoid(),
+                    creator: user.email,
+                    owner_id: user.id,
+                    content,
+                    copy_counter: newCounter, // ✅ Incremented value
+                }])
+                .select()
+                .maybeSingle();
+
+            if (insertErr) throw insertErr;
+            const newId = newDoc.id;
+
+            // 4️⃣ (Optional) Increment the counter in the original document
+            await supabase
+                .from("documents")
+                .update({ copy_counter: newCounter })
+                .eq("id", oldId);
+
+            // 5️⃣ Copy all images
             await copyDocumentImages(oldId, newId);
 
-            // 🧠 Copy organelle text and metadata
+            // 6️⃣ Copy organelle text and metadata
             await upsertOrganellesText(newId, content);
 
-            // Open new document
+            // 7️⃣ Open the new document in a new tab
             window.open(`/MentoriCelulaAnimal/Editor/editor.html?id=${newId}`, "_blank");
+
         } catch (err) {
-            console.error(err);
+            console.error("❌ Copy failed:", err);
             alert("Error al copiar el documento: " + err.message);
         }
     });

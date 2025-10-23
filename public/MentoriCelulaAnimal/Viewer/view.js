@@ -448,35 +448,47 @@ window.addEventListener("DOMContentLoaded", async () => {
 });
 
 
-// 🧩 Helper: List images in a folder (authenticated or public-safe)
+// 🧩 Helper: List images in a folder (supports UUID suffixes like img_0_xxxxx.gif)
 async function listFolderImages(path, isLoggedIn, basePublicUrl) {
-    if (isLoggedIn) {
-        // Authenticated: use Supabase Storage listing
-        try {
-            const { data, error } = await supabase.storage
-                .from(IMGS_BUCKET)
-                .list(path, { limit: 100 });
+    try {
+        // List all files in the folder
+        const { data, error } = await supabase.storage
+            .from(IMGS_BUCKET)
+            .list(path, { limit: 100 });
 
-            if (error) throw error;
-            if (!data || data.length === 0) return [];
-
-            return data
-                .filter(f => f.name.endsWith(".png") || f.name.endsWith(".jpg"))
-                .map(f => `${basePublicUrl}/${path}/${f.name}`);
-        } catch (err) {
-            console.warn("⚠️ Error listing images (auth):", path, err.message);
-            // Fallback to public
+        if (error) throw error;
+        if (!data || data.length === 0) {
+            console.log(`ℹ️ No files found in folder: ${path}`);
+            return [];
         }
-    }
 
-    // Public fallback: try common image names
-    const urls = [];
-    for (let i = 0; i < 10; i++) {
-        const url = `${basePublicUrl}/${path}/img_${i}.png`;
-        if (await imageExists(url)) urls.push(url);
+        // Filter files that start with img_ and are valid image types
+        const validFiles = data.filter(f =>
+            f.name.match(/^img_.*\.(png|jpg|jpeg|gif|webp)$/i)
+        );
+
+        if (validFiles.length === 0) {
+            console.log(`⚠️ No valid image files found in folder: ${path}`);
+            return [];
+        }
+
+        // Construct full URLs
+        const urls = validFiles.map(f => `${basePublicUrl}/${path}/${f.name}`);
+        return urls;
+
+    } catch (err) {
+        console.warn("⚠️ Error listing images for", path, err.message);
+
+        // Fallback (public-safe): try numbered guesses
+        const urls = [];
+        for (let i = 0; i < 10; i++) {
+            const url = `${basePublicUrl}/${path}/img_${i}.png`;
+            if (await imageExists(url)) urls.push(url);
+        }
+        return urls;
     }
-    return urls;
 }
+
 
 // 🧩 Helper to check if an image exists
 async function imageExists(url) {

@@ -880,40 +880,32 @@ if (saveonlinebutton) {
 }
 
 
-// ==============================
-// UNIFIED SMART IMAGE UPLOADER
-// ==============================
+// -----------------------------
+// UNIFIED SMART IMAGE UPLOADER (FIXED)
+// -----------------------------
 async function uploadAllImagesForDocument(documentId, editorContent) {
     if (!documentId) throw new Error("uploadAllImagesForDocument requires a documentId");
 
-    console.log("🖼️ Starting unified upload for document:", documentId);
-    const uploadedUrls = new Set();
+    console.log("🖼️ Starting upload for document:", documentId);
 
-    // Helper: Convert dataURL → Blob
-    function dataURLtoBlob(dataURL) {
-        const [meta, base64] = dataURL.split(",");
-        const mime = meta.match(/:(.*?);/)[1];
-        const binary = atob(base64);
-        const array = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
-        return new Blob([array], { type: mime });
-    }
+    // We'll track relative storage paths so cleanup doesn't remove newly uploaded files
+    const uploadedPaths = new Set();
 
-    // Helper: Get file extension from MIME
-    function extensionFromMime(mime) {
-        const map = {
-            "image/jpeg": "jpg",
-            "image/png": "png",
-            "image/gif": "gif",
-            "image/webp": "webp",
-        };
-        return map[mime] || "png";
-    }
+    // Helper: slugify folder names (membrana celular -> membrana_celular)
+    const slugify = (s) => (s || "unknown")
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "_")
+        .replace(/[^\w_-]/g, "");
 
-    // ----------------------------------
-    // 🧩 Upload Main Images
-    // ----------------------------------
-    const mainImgs = [...(document.querySelectorAll("#mainimages img") || [])];
+    // --- MAIN IMAGES ---
+    // Defensive: prefer the known container variable if available, else fallback to selector
+    const mainContainer = (typeof mainimagesContainer !== "undefined" && mainimagesContainer)
+        ? mainimagesContainer
+        : document.getElementById("main-image-images") || document.querySelector("#mainimages");
+
+    const mainImgs = mainContainer ? [...mainContainer.querySelectorAll("img")] : [];
     console.log(`📦 Found ${mainImgs.length} main images.`);
 
     for (let i = 0; i < mainImgs.length; i++) {
@@ -922,140 +914,153 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
         if (!src) continue;
 
         try {
-            // ✅ Skip if already uploaded
+            // If already stored in the bucket, just keep its relative path so cleanup knows to keep it
             if (src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
-                uploadedUrls.add(src);
+                const rel = src.split(`/storage/v1/object/public/${IMGS_BUCKET}/`)[1];
+                if (rel) uploadedPaths.add(rel);
                 continue;
             }
 
-            // 🆕 Upload base64 or blob URLs
-            if (src.startsWith("data:")) {
-                const blob = dataURLtoBlob(src);
-                const ext = extensionFromMime(blob.type);
-                const path = `${documentId}/main_imgs/img_${i}_${crypto.randomUUID()}.${ext}`;
-                console.log("🪣 Uploading", path);
+            // Otherwise fetch/upload (works for data: URIs and remote URLs)
+            const blob = await getBlobFromSrc(src);
+            const ext = extensionFromMime(blob.type || "image/png");
+            const filename = `main_imgs/img_${i}_${crypto.randomUUID()}.${ext}`;
+            const path = `${documentId}/${filename}`;
 
-                const { error } = await supabase.storage
-                    .from(IMGS_BUCKET)
-                    .upload(path, blob, { upsert: true });
+            const publicUrl = await uploadBlobToBucket(IMGS_BUCKET, path, blob);
 
-                if (error) throw error;
+            // update DOM to point to the uploaded resource
+            img.src = publicUrl;
+            img.dataset.src = publicUrl;
 
-                const { data } = supabase.storage
-                    .from(IMGS_BUCKET)
-                    .getPublicUrl(path);
-                const publicUrl = data.publicUrl;
+            uploadedPaths.add(`${documentId}/${filename}`);
+            console.log("✅ Uploaded main image:", publicUrl);
 
-                img.src = publicUrl;
-                img.dataset.src = publicUrl;
-                uploadedUrls.add(publicUrl);
-                console.log("✅ Uploaded main image:", publicUrl);
-                await new Promise(r => setTimeout(r, 150));
-            }
+            // small delay to avoid throttling
+            await new Promise(r => setTimeout(r, 120));
         } catch (err) {
-            console.error("⚠️ Failed to upload main image:", err);
+            console.warn("⚠️ Failed to upload main image:", err);
         }
     }
 
-    // ----------------------------------
-    // 🔬 Upload Organelle Images
-    // ----------------------------------
-    const organelles = [...document.querySelectorAll(".organelo")];
+    // --- ORGANELE IMAGES ---
+    // Accept either .organelos (container) or .organelo (item) classes — be defensive
+    const organelleNodeList = document.querySelectorAll(".organelo, .organelos .organelo, .organelos");
+    // Normalize: create array of actual organelle elements (elements that represent a single organelle)
+    const organelles = [];
+    organelleNodeList.forEach(n => {
+        // If the node is a container that contains multiple organelle children, pick children with class organelo
+        if (n.classList.contains("organelos")) {
+            n.querySelectorAll(".organelo").forEach(child => organelles.push(child));
+            // If it has no .organelo children but itself has id and data-image, treat it as one
+            if (n.id && !n.querySelector(".organelo")) organelles.push(n);
+        } else {
+            organelles.push(n);
+        }
+    });
+
+    // Fallback: if still empty, try the legacy selector
+    if (organelles.length === 0) {
+        document.querySelectorAll(".organelos").forEach(n => {
+            organelles.push(n);
+        });
+    }
+
     console.log(`🧬 Found ${organelles.length} organelles to process.`);
 
     for (const organel of organelles) {
-        const folderName = (organel.id || organel.dataset.organelId || "unknown")
-            .trim()
-            .toLowerCase()
-            .replace(/\s+/g, "_")
-            .replace(/[^\w_-]/g, "");
+        // Determine folder name from element id or dataset.organelId
+        const rawName = organel.id || organel.dataset?.organelId || organel.dataset?.name || "unknown";
+        const folderName = slugify(rawName);
 
+        // Collect images for this organelle: prefer dataset.image JSON, else <img> children
         let imgs = [];
         try {
             imgs = JSON.parse(organel.dataset.image || "[]");
+            if (!Array.isArray(imgs)) imgs = [];
         } catch {
             imgs = [];
         }
 
+        if (imgs.length === 0) {
+            imgs = [...organel.querySelectorAll("img")].map(i => i.src).filter(Boolean);
+        }
+
         const newUrls = [];
+
         for (let i = 0; i < imgs.length; i++) {
             const src = imgs[i];
             if (!src) continue;
 
             try {
-                // ✅ Skip if already uploaded
+                // If already in storage, keep it and register the relative path
                 if (src.includes(`/storage/v1/object/public/${IMGS_BUCKET}/`)) {
+                    const rel = src.split(`/storage/v1/object/public/${IMGS_BUCKET}/`)[1];
+                    if (rel) uploadedPaths.add(rel);
                     newUrls.push(src);
-                    uploadedUrls.add(src);
                     continue;
                 }
 
-                // 🆕 Upload new base64 image
-                if (src.startsWith("data:")) {
-                    const blob = dataURLtoBlob(src);
-                    const ext = extensionFromMime(blob.type);
-                    const path = `${documentId}/${folderName}/img_${i}_${crypto.randomUUID()}.${ext}`;
-                    console.log("🧪 Uploading organelle image:", path);
+                // Upload (supports data: plus remote URLs)
+                const blob = await getBlobFromSrc(src);
+                const ext = extensionFromMime(blob.type || "image/png");
+                const filename = `${folderName}/img_${i}_${crypto.randomUUID()}.${ext}`;
+                const path = `${documentId}/${filename}`;
 
-                    const { error } = await supabase.storage
-                        .from(IMGS_BUCKET)
-                        .upload(path, blob, { upsert: true });
-                    if (error) throw error;
+                const publicUrl = await uploadBlobToBucket(IMGS_BUCKET, path, blob);
 
-                    const { data } = supabase.storage
-                        .from(IMGS_BUCKET)
-                        .getPublicUrl(path);
-                    const publicUrl = data.publicUrl;
+                // push resulting public URL
+                newUrls.push(publicUrl);
+                uploadedPaths.add(path);
 
-                    newUrls.push(publicUrl);
-                    uploadedUrls.add(publicUrl);
-                    console.log("✅ Uploaded organelle image:", publicUrl);
-                    await new Promise(r => setTimeout(r, 150));
-                }
+                console.log(`✅ Uploaded organelle image (${folderName}):`, publicUrl);
+                await new Promise(r => setTimeout(r, 120));
             } catch (err) {
-                console.error(`⚠️ Failed to upload image for ${folderName}:`, err);
+                console.warn(`⚠️ Failed to upload organelle image for ${folderName}:`, err);
+                // preserve original src if upload failed
                 if (src) newUrls.push(src);
             }
         }
 
-        // Update organelle dataset with new URLs
+        // Persist URLs back to the DOM for later DB upsert
         organel.dataset.image = JSON.stringify(newUrls);
     }
 
-    // ----------------------------------
-    // 🧹 Cleanup unused files
-    // ----------------------------------
+    // --- CLEANUP (remove files under documentId not referenced in uploadedPaths) ---
     try {
-        const baseUrl = supabase.storageUrl || supabase.supabaseUrl || "";
-        const publicBase = `${baseUrl}/storage/v1/object/public/${IMGS_BUCKET}`;
-        const { data: files, error } = await supabase.storage
+        // get listing of top-level entries under documentId
+        const { data: list, error: listErr } = await supabase.storage
             .from(IMGS_BUCKET)
             .list(documentId, { limit: 1000 });
 
-        if (error) {
-            console.warn("⚠️ Cleanup list error:", error.message);
+        if (listErr) {
+            console.warn("⚠️ Could not list files for cleanup:", listErr.message);
         } else {
-            for (const f of files) {
-                if (!f.name) continue;
-
-                if (f.name.includes(".")) {
-                    const url = `${publicBase}/${documentId}/${encodeURIComponent(f.name)}`;
-                    if (!uploadedUrls.has(url)) {
-                        console.log("🧹 Removing unused file:", f.name);
-                        await supabase.storage.from(IMGS_BUCKET)
-                            .remove([`${documentId}/${f.name}`]);
+            // For each file or folder under documentId, check whether any file path is in keep set
+            for (const entry of list || []) {
+                if (entry.name.includes(".")) {
+                    // direct file under documentId (unlikely if you put everything in folders, but handle it)
+                    const path = `${documentId}/${entry.name}`;
+                    if (!uploadedPaths.has(path)) {
+                        console.log("🧹 Removing unused file:", path);
+                        await supabase.storage.from(IMGS_BUCKET).remove([path]);
                     }
                 } else {
-                    // Subfolder
-                    const { data: subFiles } = await supabase.storage
+                    // it's a folder: list its contents
+                    const { data: subFiles, error: subErr } = await supabase.storage
                         .from(IMGS_BUCKET)
-                        .list(`${documentId}/${f.name}`);
+                        .list(`${documentId}/${entry.name}`, { limit: 1000 });
+
+                    if (subErr) {
+                        console.warn("⚠️ Could not list subfolder for cleanup:", entry.name, subErr.message);
+                        continue;
+                    }
+
                     for (const sf of subFiles || []) {
-                        const url = `${publicBase}/${documentId}/${f.name}/${encodeURIComponent(sf.name)}`;
-                        if (!uploadedUrls.has(url)) {
-                            console.log("🧹 Removing unused subfile:", f.name, sf.name);
-                            await supabase.storage.from(IMGS_BUCKET)
-                                .remove([`${documentId}/${f.name}/${sf.name}`]);
+                        const path = `${documentId}/${entry.name}/${sf.name}`;
+                        if (!uploadedPaths.has(path)) {
+                            console.log("🧹 Removing unused subfile:", path);
+                            await supabase.storage.from(IMGS_BUCKET).remove([path]);
                         }
                     }
                 }
@@ -1071,7 +1076,7 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
 
 
 // -----------------------------
-// Organelles table upsert + image sync
+// ORGANELES TABLE UPSERT (does text + uses dataset.image produced above)
 // -----------------------------
 async function upsertOrganellesText(documentId, editorContent) {
     console.log("🧬 Starting organelle save for:", documentId);
@@ -1079,76 +1084,47 @@ async function upsertOrganellesText(documentId, editorContent) {
     const user = await getCurrentUser();
     if (!user) throw new Error("Must be logged-in to save organelles");
 
-    // Ensure table payload base
     const payload = {
         id: `${documentId}-organelles`,
         document_id: documentId,
         creator: user.email,
     };
 
-    // Go through each organelle element
     for (const domId in ORGANELLE_COLUMN_MAP) {
         const colName = ORGANELLE_COLUMN_MAP[domId];
         const el = document.getElementById(domId);
-        if (!el) continue;
+        if (!el) {
+            payload[colName] = "";
+            continue;
+        }
 
-        const dataContent = el.dataset?.content ?? "";
-        payload[colName] = dataContent;
+        // text
+        payload[colName] = el.dataset?.content ?? "";
 
-        // Check for image inside organelle
-        const img = el.querySelector("img");
-        if (img && img.src && img.src.startsWith("data:")) {
-            // Create folder path for organelle
-            const folderPath = `${IMGS_BUCKET}/${documentId}/${domId}`;
-            const imgName = `img_0_${crypto.randomUUID()}.gif`; // keep consistent naming
-
-            console.log(`🧫 Uploading organelle image for ${domId}: ${imgName}`);
-
-            const { data, error } = await supabase.storage
-                .from(IMGS_BUCKET)
-                .upload(`${documentId}/${domId}/${imgName}`, dataURLtoBlob(img.src), {
-                    upsert: true,
-                    cacheControl: "3600",
-                });
-
-            if (error) {
-                console.error(`❌ Error uploading organelle image for ${domId}`, error);
-                continue;
-            }
-
-            // Generate public URL
-            const { data: publicUrlData } = supabase.storage
-                .from(IMGS_BUCKET)
-                .getPublicUrl(`${documentId}/${domId}/${imgName}`);
-
-            const publicUrl = publicUrlData.publicUrl;
-            payload[`${colName}_img`] = publicUrl; // e.g., aparato_de_golgi_img column
-            console.log(`✅ Uploaded organelle ${domId} image:`, publicUrl);
+        // images: store array of public urls (if any) as JSON string or leave empty array
+        try {
+            const imgs = JSON.parse(el.dataset.image || "[]");
+            // If you want to store the array in a separate column, add payload[`${colName}_images`] = imgs
+            // For now we won't create new DB columns; keep image info on dataset if needed
+            payload[`${colName}_image_urls`] = JSON.stringify(imgs || []);
+        } catch {
+            payload[`${colName}_image_urls`] = JSON.stringify([]);
         }
     }
 
-    console.log("📤 Final organelle payload:", payload);
-
-    // Save / update in Supabase table
+    // upsert into organelles table using document_id as unique constraint
     const { error } = await supabase
         .from("organelles")
         .upsert(payload, { onConflict: "document_id" });
 
-    if (error) throw error;
+    if (error) {
+        console.error("❌ upsertOrganellesText failed:", error);
+        throw error;
+    }
+
     console.log("✅ Organelles saved successfully to table.");
     return true;
 }
-
-// Helper to convert dataURL → Blob for upload
-function dataURLtoBlob(dataURL) {
-    const [meta, base64] = dataURL.split(",");
-    const mime = meta.match(/:(.*?);/)[1];
-    const binary = atob(base64);
-    const array = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
-    return new Blob([array], { type: mime });
-}
-
 
 // -----------------------------
 // Load local .txt dataset

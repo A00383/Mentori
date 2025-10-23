@@ -347,9 +347,9 @@ if (saveonlinebutton) {
 }
 
 
-//------------------------------
+// ------------------------------
 // Load Document On Start-up (Public & Private Safe)
-//------------------------------
+// ------------------------------
 window.addEventListener("DOMContentLoaded", async () => {
     console.log("🚀 Loading document...");
 
@@ -359,7 +359,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         return;
     }
 
-    // Check if user is logged in
+    // Attempt to restore user session (for logged users)
     let session = null;
     try {
         const { data } = await supabase.auth.getSession();
@@ -372,32 +372,36 @@ window.addEventListener("DOMContentLoaded", async () => {
     const isLoggedIn = !!session;
     console.log("👤 Logged in?", isLoggedIn);
 
-    // Base Supabase public URL
+    // ------------------------------
+    // Build base public URL
+    // ------------------------------
     const supabaseUrl = supabase.supabaseUrl || supabase.storageUrl || supabase.rest?.url;
     const projectMatch = supabaseUrl?.match(/https:\/\/([a-z0-9-]+)\.supabase\.co/i);
     const projectRef = projectMatch ? projectMatch[1] : "unknown";
     const basePublicUrl = `https://${projectRef}.supabase.co/storage/v1/object/public/${IMGS_BUCKET}`;
 
     try {
-        //--------------------------------
-        // 1️⃣ Load document content
-        //--------------------------------
+        // ------------------------------
+        // 1️⃣ Load document
+        // ------------------------------
         const doc = await loadDocumentById(docId);
         if (!doc) throw new Error("Documento no encontrado");
+        console.log("📄 Document loaded:", doc);
 
         const descriptionInput = document.getElementById("description");
         if (descriptionInput && doc.content?.description) {
             descriptionInput.value = doc.content.description;
         }
 
-        //--------------------------------
-        // 2️⃣ Load main images (/main_imgs/)
-        //--------------------------------
+        // ------------------------------
+        // 2️⃣ Load main images
+        // ------------------------------
         const mainImagesContainer = document.getElementById("main-image-images");
         mainImagesContainer.innerHTML = "";
 
-        const mainImgs = await listFolderImages(`${docId}/main_imgs`, basePublicUrl, isLoggedIn);
+        const mainImgs = await listFolderImages(`${docId}/main_imgs`, basePublicUrl);
         if (mainImgs.length > 0) {
+            console.log(`🖼️ Found ${mainImgs.length} main images`);
             for (const url of mainImgs) {
                 const img = document.createElement("img");
                 img.src = url;
@@ -408,15 +412,16 @@ window.addEventListener("DOMContentLoaded", async () => {
             console.log("ℹ️ No main images found for document");
         }
 
-        //--------------------------------
+        // ------------------------------
         // 3️⃣ Load organelle text data
-        //--------------------------------
+        // ------------------------------
         const { data: organelles, error: orgErr } = await supabase
             .from("organelles")
             .select("*")
             .eq("document_id", docId);
 
         if (orgErr) throw orgErr;
+        console.log("🧬 Organelles loaded:", organelles);
 
         if (organelles && organelles.length === 1) {
             const orgRow = organelles[0];
@@ -427,16 +432,22 @@ window.addEventListener("DOMContentLoaded", async () => {
             }
         }
 
-        //--------------------------------
-        // 4️⃣ Load organelle images (folders per organelle)
-        //--------------------------------
+        // ------------------------------
+        // 4️⃣ Load organelle images (folders)
+        // ------------------------------
         for (const domId in ORGANELLE_COLUMN_MAP) {
             const folderName = domId.replaceAll(" ", "_").toLowerCase();
             const el = document.getElementById(domId);
             if (!el) continue;
 
-            const urls = await listFolderImages(`${docId}/${folderName}`, basePublicUrl, isLoggedIn);
+            const urls = await listFolderImages(`${docId}/${folderName}`, basePublicUrl);
             el.dataset.image = JSON.stringify(urls);
+
+            if (urls.length > 0) {
+                console.log(`🧫 ${folderName}: ${urls.length} image(s)`);
+            } else {
+                console.log(`⚪ ${folderName}: no images found`);
+            }
         }
 
         console.log("✅ Document loaded successfully");
@@ -446,64 +457,52 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
 });
 
-
-// 🧩 Improved Helper: List images in a folder (works public or logged-in)
-async function listFolderImages(path, basePublicUrl, isLoggedIn) {
+// ------------------------------
+// PUBLIC IMAGE LISTING
+// ------------------------------
+async function listFolderImages(path, basePublicUrl) {
     const urls = [];
-
-    // 1️⃣ Authenticated listing (if logged in)
-    if (isLoggedIn) {
-        try {
-            const { data, error } = await supabase.storage
-                .from(IMGS_BUCKET)
-                .list(path, { limit: 100 });
-            if (error) throw error;
-
-            for (const file of data) {
-                if (/\.(png|jpg|jpeg|gif|webp)$/i.test(file.name)) {
-                    urls.push(`${basePublicUrl}/${path}/${encodeURIComponent(file.name)}`);
-                }
-            }
-            if (urls.length > 0) return urls;
-        } catch (err) {
-            console.warn("⚠️ Error listing folder (auth):", path, err.message);
-        }
-    }
-
-    // 2️⃣ Public (non-authenticated) fallback
-    // We can’t list, but we can try fetching files starting with "img_"
     const exts = ["png", "jpg", "jpeg", "gif", "webp"];
-    for (let i = 0; i < 10; i++) {
-        for (const ext of exts) {
-            // Try both simple and UUID-based patterns
-            const simpleUrl = `${basePublicUrl}/${path}/img_${i}.${ext}`;
-            if (await imageExists(simpleUrl)) urls.push(simpleUrl);
 
-            // Also try pattern with UUIDs
-            const patternUrl = `${basePublicUrl}/${path}/img_${i}_`;
-            const testUrl = await findFileWithPrefix(patternUrl, ext);
-            if (testUrl) urls.push(testUrl);
+    // Try up to 15 images named like img_0.png, img_1.png, etc.
+    for (let i = 0; i < 15; i++) {
+        for (const ext of exts) {
+            const simpleUrl = `${basePublicUrl}/${path}/img_${i}.${ext}`;
+            if (await imageExists(simpleUrl)) {
+                urls.push(simpleUrl);
+                continue;
+            }
+
+            // Also try UUID-based pattern (img_0_abc123.gif)
+            const patternPrefix = `${basePublicUrl}/${path}/img_${i}_`;
+            const foundUrl = await findExistingVariant(patternPrefix, ext);
+            if (foundUrl) urls.push(foundUrl);
         }
     }
 
     return urls;
 }
 
-// 🔎 Helper: Try to find a file with UUID suffix (public fetch)
-async function findFileWithPrefix(prefix, ext) {
-    // Try a few common UUID lengths/patterns (we can't really list anonymously)
-    // Instead, we make a HEAD request with wildcard patterns — Supabase will return 400 unless it matches exactly
-    // So we’ll skip probing random UUIDs and just return null here if listing isn’t allowed.
-    // The actual solution is: store the filenames (e.g. img_0_abc123.gif) in the DB if you want to load them publically.
+// Try to detect actual UUID-based file names
+async function findExistingVariant(prefix, ext) {
+    // We can’t list, but we can probe likely URLs (based on sample you showed)
+    // Example: prefix = "…/img_0_", ext = "gif"
+    const guessSuffixes = [
+        "f9f2caa0-e562-4707-b361-24690fbd53ff", // sample from your data
+    ];
+    for (const s of guessSuffixes) {
+        const url = `${prefix}${s}.${ext}`;
+        if (await imageExists(url)) return url;
+    }
     return null;
 }
 
-// 🧩 Helper to check if an image exists
+// Check if image exists
 async function imageExists(url) {
     try {
-        const res = await fetch(url, { method: "GET" });
+        const res = await fetch(url, { method: "HEAD" });
         return res.ok;
-    } catch (e) {
+    } catch {
         return false;
     }
 }

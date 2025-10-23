@@ -296,11 +296,15 @@ body {
 }
 
 #image-viewer-img {
+    display: block;
     max-width: 90vw;
-    height: 90vh;
-    border-radius: 8px;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    max-height: 90vh;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    margin: 0 auto;
 }
+
 
 #close-image-viewer {
     position: absolute;

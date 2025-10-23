@@ -366,13 +366,14 @@ body {
 }
 
 #image-viewer-img {
-    display: block;
+    height: 90vh;
+    width: auto;
     max-width: 90vw;
-    max-height: 90vh;
-    height: auto;
     object-fit: contain;
+    display: block;
     margin: 0 auto;
 }
+
 
 
 #close-image-viewer {

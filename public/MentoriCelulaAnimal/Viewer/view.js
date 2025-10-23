@@ -372,7 +372,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     const isLoggedIn = !!session;
     console.log("👤 Logged in?", isLoggedIn);
 
-    // Build base Supabase Storage URL
+    // Base Supabase public URL
     const supabaseUrl = supabase.supabaseUrl || supabase.storageUrl || supabase.rest?.url;
     const projectMatch = supabaseUrl?.match(/https:\/\/([a-z0-9-]+)\.supabase\.co/i);
     const projectRef = projectMatch ? projectMatch[1] : "unknown";
@@ -385,19 +385,18 @@ window.addEventListener("DOMContentLoaded", async () => {
         const doc = await loadDocumentById(docId);
         if (!doc) throw new Error("Documento no encontrado");
 
-        // Description
         const descriptionInput = document.getElementById("description");
         if (descriptionInput && doc.content?.description) {
             descriptionInput.value = doc.content.description;
         }
 
         //--------------------------------
-        // 2️⃣ Load main images (from /main_imgs/)
+        // 2️⃣ Load main images (/main_imgs/)
         //--------------------------------
         const mainImagesContainer = document.getElementById("main-image-images");
         mainImagesContainer.innerHTML = "";
 
-        const mainImgs = await listFolderImages(`${docId}/main_imgs`, isLoggedIn, basePublicUrl);
+        const mainImgs = await listFolderImages(`${docId}/main_imgs`, basePublicUrl);
         if (mainImgs.length > 0) {
             for (const url of mainImgs) {
                 const img = document.createElement("img");
@@ -429,14 +428,14 @@ window.addEventListener("DOMContentLoaded", async () => {
         }
 
         //--------------------------------
-        // 4️⃣ Load organelle images (one folder per organelle)
+        // 4️⃣ Load organelle images (folders per organelle)
         //--------------------------------
         for (const domId in ORGANELLE_COLUMN_MAP) {
             const folderName = domId.replaceAll(" ", "_").toLowerCase();
             const el = document.getElementById(domId);
             if (!el) continue;
 
-            const urls = await listFolderImages(`${docId}/${folderName}`, isLoggedIn, basePublicUrl);
+            const urls = await listFolderImages(`${docId}/${folderName}`, basePublicUrl);
             el.dataset.image = JSON.stringify(urls);
         }
 
@@ -448,61 +447,36 @@ window.addEventListener("DOMContentLoaded", async () => {
 });
 
 
-// 🧩 Helper: List images in a folder (supports UUID suffixes like img_0_xxxxx.gif)
-async function listFolderImages(path, isLoggedIn, basePublicUrl) {
+// 🧩 Helper: List images in a folder (public-safe)
+async function listFolderImages(path, basePublicUrl) {
     try {
-        // List all files in the folder
+        // Always attempt listing — works for both public and logged-in buckets
         const { data, error } = await supabase.storage
             .from(IMGS_BUCKET)
             .list(path, { limit: 100 });
 
-        if (error) throw error;
-        if (!data || data.length === 0) {
-            console.log(`ℹ️ No files found in folder: ${path}`);
+        if (error) {
+            console.warn("⚠️ Error listing folder:", path, error.message);
             return [];
         }
 
-        // Filter files that start with img_ and are valid image types
-        const validFiles = data.filter(f =>
-            f.name.match(/^img_.*\.(png|jpg|jpeg|gif|webp)$/i)
-        );
+        if (!data || data.length === 0) return [];
 
-        if (validFiles.length === 0) {
-            console.log(`⚠️ No valid image files found in folder: ${path}`);
-            return [];
-        }
-
-        // Construct full URLs
-        const urls = validFiles.map(f => `${basePublicUrl}/${path}/${f.name}`);
-        return urls;
-
+        // Accept all standard formats
+        return data
+            .filter(f =>
+                /\.(png|jpg|jpeg|gif|webp)$/i.test(f.name)
+            )
+            .map(f => `${basePublicUrl}/${path}/${f.name}`);
     } catch (err) {
-        console.warn("⚠️ Error listing images for", path, err.message);
-
-        // Fallback (public-safe): try numbered guesses
-        const urls = [];
-        for (let i = 0; i < 10; i++) {
-            const url = `${basePublicUrl}/${path}/img_${i}.png`;
-            if (await imageExists(url)) urls.push(url);
-        }
-        return urls;
-    }
-}
-
-
-// 🧩 Helper to check if an image exists
-async function imageExists(url) {
-    try {
-        const res = await fetch(url, { method: "HEAD" });
-        return res.ok;
-    } catch {
-        return false;
+        console.warn("⚠️ Could not list images for", path, err.message);
+        return [];
     }
 }
 
 
 // -----------------------------
-// Helper: Load document by ID (with safe JSON parsing)
+// Helper: Load document by ID (safe JSON parsing)
 // -----------------------------
 async function loadDocumentById(id) {
     const { data, error } = await supabase
@@ -514,7 +488,6 @@ async function loadDocumentById(id) {
     if (error) throw error;
     if (!data) return null;
 
-    // Ensure content is parsed JSON
     if (typeof data.content === "string") {
         try {
             data.content = JSON.parse(data.content);
@@ -526,6 +499,7 @@ async function loadDocumentById(id) {
 
     return data;
 }
+
 
 
 

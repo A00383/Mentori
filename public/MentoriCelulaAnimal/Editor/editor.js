@@ -70,12 +70,6 @@ let popupimageremoveMode = false;
 let mainimageremoveMode = false;
 
 // -----------------------------
-// Configuration
-// -----------------------------
-const BUCKET_ROOT_FOLDER = ""; // root within bucket; kept blank so we upload as `${docId}/...`
-const SUPABASE_PUBLIC_BASE = ""; // not used directly; we use getPublicUrl per file
-
-// -----------------------------
 // Organelles -> DB column mapping
 // Note: columns come from the SQL you supplied. There are some naming differences
 // (e.g. 'citplasma_content' in your SQL; we map safely).

@@ -860,11 +860,16 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
         }
     }
 
-    // --- ORGANELE IMAGES ---
+// --- ORGANELE IMAGES ---
     const organelos = document.querySelectorAll(".organelo");
+    console.log("Found organelles:", organelos.length);
+
     for (const organel of organelos) {
         let imgs = [];
         try { imgs = JSON.parse(organel.dataset.image || "[]"); } catch {}
+        if (imgs.length === 0) {
+            imgs = [...organel.querySelectorAll("img")].map(i => i.src);
+        }
 
         const folderName = (organel.id || organel.dataset?.organelId || "unknown")
             .trim()
@@ -873,6 +878,7 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
             .replace(/[^\w_-]/g, "");
 
         const newUrls = [];
+
         for (let i = 0; i < imgs.length; i++) {
             const src = imgs[i];
             try {
@@ -887,6 +893,7 @@ async function uploadAllImagesForDocument(documentId, editorContent) {
                 const ext = extensionFromMime(blob.type || "image/png");
                 const path = `${documentId}/${folderName}/img_${i}_${crypto.randomUUID()}.${ext}`;
                 const publicUrl = await uploadBlobToBucket(IMGS_BUCKET, path, blob);
+
                 uploadedPaths.add(path);
                 newUrls.push(publicUrl);
             } catch (err) {

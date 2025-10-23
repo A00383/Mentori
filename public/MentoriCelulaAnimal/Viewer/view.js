@@ -346,9 +346,6 @@ if (saveonlinebutton) {
     });
 }
 
-//------------------------------
-// Load Document On Start-up (Completely Public Safe)
-//------------------------------
 
 //------------------------------
 // Load Document On Start-up (Public & Private Safe)
@@ -362,7 +359,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         return;
     }
 
-    // Restore session silently (optional)
+    // Try restoring session
     try {
         await supabase.auth.getSession();
         await renderUser();
@@ -370,14 +367,16 @@ window.addEventListener("DOMContentLoaded", async () => {
         console.warn("⚠️ Could not restore session:", err);
     }
 
-    // Dynamically extract project ref and base URL
+    // Build base Supabase Storage URL
     const supabaseUrl = supabase.supabaseUrl || supabase.storageUrl || supabase.rest?.url;
     const projectMatch = supabaseUrl?.match(/https:\/\/([a-z0-9-]+)\.supabase\.co/i);
     const projectRef = projectMatch ? projectMatch[1] : "unknown";
     const basePublicUrl = `https://${projectRef}.supabase.co/storage/v1/object/public/${IMGS_BUCKET}`;
 
     try {
-        // --- Load document content ---
+        //--------------------------------
+        // 1️⃣ Load document content
+        //--------------------------------
         const { data: doc, error: docError } = await supabase
             .from("documents")
             .select("content")
@@ -393,34 +392,27 @@ window.addEventListener("DOMContentLoaded", async () => {
             descriptionInput.value = doc.content.description;
         }
 
-        // --- Load main images (public URL method) ---
-        const mainimagesContainer = document.getElementById("main-image-images");
-        mainimagesContainer.innerHTML = "";
+        //--------------------------------
+        // 2️⃣ Load main images (from /main_imgs/)
+        //--------------------------------
+        const mainImagesContainer = document.getElementById("main-image-images");
+        mainImagesContainer.innerHTML = "";
 
-        // We'll assume image filenames are in the stored dataset if possible
-        const possibleImgs = doc.content?.mainImages || [];
-        if (possibleImgs.length) {
-            possibleImgs.forEach(src => {
+        const mainImgs = await listFolderImages(`${docId}/main_imgs`);
+        if (mainImgs.length > 0) {
+            for (const url of mainImgs) {
                 const img = document.createElement("img");
-                img.src = src;
+                img.src = url;
                 img.classList.add("main-image");
-                mainimagesContainer.appendChild(img);
-            });
-        } else {
-            // If not stored, try to load numbered fallbacks (img_0, img_1, etc.)
-            for (let i = 0; i < 10; i++) {
-                const url = `${basePublicUrl}/${docId}/main_imgs/img_${i}.png`;
-                const exists = await imageExists(url);
-                if (exists) {
-                    const img = document.createElement("img");
-                    img.src = url;
-                    img.classList.add("main-image");
-                    mainimagesContainer.appendChild(img);
-                }
+                mainImagesContainer.appendChild(img);
             }
+        } else {
+            console.log("ℹ️ No main images found for document");
         }
 
-        // --- Load organelle text and image data ---
+        //--------------------------------
+        // 3️⃣ Load organelle text data
+        //--------------------------------
         const { data: organelles, error: orgErr } = await supabase
             .from("organelles")
             .select("*")
@@ -428,7 +420,6 @@ window.addEventListener("DOMContentLoaded", async () => {
 
         if (orgErr) throw orgErr;
 
-        // Text content
         if (organelles && organelles.length === 1) {
             const orgRow = organelles[0];
             for (const domId in ORGANELLE_COLUMN_MAP) {
@@ -438,38 +429,50 @@ window.addEventListener("DOMContentLoaded", async () => {
             }
         }
 
-        // Image loading for each organelle
+        //--------------------------------
+        // 4️⃣ Load organelle images (one folder per organelle)
+        //--------------------------------
         for (const domId in ORGANELLE_COLUMN_MAP) {
-            const folderName = domId.replaceAll(" ", "_");
+            const folderName = domId.replaceAll(" ", "_").toLowerCase();
             const el = document.getElementById(domId);
             if (!el) continue;
 
-            const urls = [];
-            for (let i = 0; i < 10; i++) {
-                const url = `${basePublicUrl}/${docId}/${folderName}/img_${i}.png`;
-                const exists = await imageExists(url);
-                if (exists) urls.push(url);
-            }
-
+            const urls = await listFolderImages(`${docId}/${folderName}`);
             el.dataset.image = JSON.stringify(urls);
         }
 
-        console.log("✅ Document loaded successfully (fully public-safe)");
+        console.log("✅ Document loaded successfully");
     } catch (err) {
         console.error("❌ Error loading document:", err);
         alert("No se pudo cargar el documento: " + err.message);
     }
 });
 
-// 🧩 Helper to check if an image exists without throwing CORS errors
-async function imageExists(url) {
+// 🧩 Helper: list all images in a folder
+async function listFolderImages(path) {
     try {
-        const res = await fetch(url, { method: "HEAD" });
-        return res.ok;
-    } catch {
-        return false;
+        const { data, error } = await supabase.storage
+            .from(IMGS_BUCKET)
+            .list(path, { limit: 100 });
+
+        if (error) throw error;
+        if (!data || data.length === 0) return [];
+
+        const supabaseUrl = supabase.supabaseUrl || supabase.storageUrl || supabase.rest?.url;
+        const projectMatch = supabaseUrl?.match(/https:\/\/([a-z0-9-]+)\.supabase\.co/i);
+        const projectRef = projectMatch ? projectMatch[1] : "unknown";
+        const basePublicUrl = `https://${projectRef}.supabase.co/storage/v1/object/public/${IMGS_BUCKET}`;
+
+        // Return full URLs for all images
+        return data
+            .filter(file => file.name.endsWith(".png") || file.name.endsWith(".jpg"))
+            .map(file => `${basePublicUrl}/${path}/${file.name}`);
+    } catch (err) {
+        console.warn("⚠️ Error listing images for", path, err.message);
+        return [];
     }
 }
+
 
 
 // -----------------------------

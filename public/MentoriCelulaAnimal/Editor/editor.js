@@ -793,7 +793,7 @@ if (copyBtn) {
 }
 
 // -----------------------------
-// Save Online Button
+// Save Online Button (fully fixed)
 // -----------------------------
 if (saveonlinebutton) {
     saveonlinebutton.addEventListener("click", async () => {
@@ -802,31 +802,82 @@ if (saveonlinebutton) {
 
         try {
             const user = await getCurrentUser();
-            if (!user) return alert("Debes iniciar sesión para guardar en línea.");
+            if (!user) {
+                alert("Debes iniciar sesión para guardar en línea.");
+                return;
+            }
 
+            // Make sure the organelles are rendered before saving
+            await waitForOrganeles();
+
+            // --- EXISTING DOCUMENT ---
             if (currentDocId) {
-                const doc = await loadDocumentById(currentDocId);
-                if (!doc) return alert("No se encontró el documento.");
-                if (doc.creator !== user.email)
-                    return alert("Tú no eres el creador de este documento.");
+                console.log("💾 Updating existing document:", currentDocId);
 
+                const doc = await loadDocumentById(currentDocId);
+                if (!doc) {
+                    alert("No se encontró el documento.");
+                    return;
+                }
+
+                if (doc.creator !== user.email) {
+                    alert("Tú no eres el creador de este documento.");
+                    return;
+                }
+
+                // 1️⃣ Update document text content
                 await updateDocument(currentDocId, content);
+
+                // 2️⃣ Upload all images (main + organelles)
                 await uploadAllImagesForDocument(currentDocId, content);
+
+                // 3️⃣ Upsert organelles (text + image metadata)
                 await upsertOrganellesText(currentDocId, content);
+
+                console.log("✅ Documento actualizado correctamente");
                 alert("Documento guardado exitosamente!");
-            } else {
+            }
+
+            // --- NEW DOCUMENT ---
+            else {
+                console.log("🆕 Creating new document...");
+
+                // 1️⃣ Create document first to get its ID
                 const newId = await createDocument(content);
+
+                // 2️⃣ Upload all images after the folder exists
                 await uploadAllImagesForDocument(newId, content);
+
+                // 3️⃣ Upsert organelles (text + images)
                 await upsertOrganellesText(newId, content);
+
+                console.log("✅ Nuevo documento creado correctamente");
                 alert("Documento guardado exitosamente!");
                 window.location.href = `../Editor/editor.html?id=${newId}`;
             }
+
         } catch (err) {
-            console.error(err);
+            console.error("❌ Error al guardar el documento:", err);
             alert("Error al guardar el documento: " + err.message);
         }
     });
 }
+
+// -----------------------------
+// Helper: Wait until organelles are rendered
+// -----------------------------
+async function waitForOrganeles(timeout = 4000) {
+    const start = performance.now();
+    while (document.querySelectorAll(".organelo").length === 0) {
+        if (performance.now() - start > timeout) {
+            console.warn("⚠️ waitForOrganeles timeout reached, continuing anyway");
+            break;
+        }
+        await new Promise(r => setTimeout(r, 100));
+    }
+    console.log("✅ Organeles ready:", document.querySelectorAll(".organelo").length);
+}
+
 
 // ==============================
 // SMART IMAGE UPLOADER (fixed cleanup logic)
@@ -948,7 +999,7 @@ async function cleanupUnusedImages(documentId, keepPathsSet) {
 }
 
 // -----------------------------
-// Organelles table upsert
+// Organelles table upsert (with image sync)
 // -----------------------------
 async function upsertOrganellesText(documentId, editorContent) {
     const user = await getCurrentUser();
@@ -960,17 +1011,37 @@ async function upsertOrganellesText(documentId, editorContent) {
         creator: user.email,
     };
 
+    // ✅ Include both text and images
     for (const domId in ORGANELLE_COLUMN_MAP) {
         const colName = ORGANELLE_COLUMN_MAP[domId];
         const el = document.getElementById(domId);
-        payload[colName] = el?.dataset?.content ?? "";
+
+        // Get the main text (content)
+        const content = el?.dataset?.content ?? "";
+
+        // Get associated image URLs (after uploadAllImagesForDocument)
+        let images = [];
+        try {
+            images = JSON.parse(el?.dataset?.image || "[]");
+        } catch {
+            images = [];
+        }
+
+        // Store both content and images together
+        payload[colName] = {
+            content,
+            images,
+        };
     }
 
+    // ✅ Upsert the full payload
     const { error } = await supabase
         .from("organelles")
         .upsert(payload, { onConflict: "document_id" });
 
     if (error) throw error;
+
+    console.log("🧬 Organelles saved:", payload);
     return true;
 }
 

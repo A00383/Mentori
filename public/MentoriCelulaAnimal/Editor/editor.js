@@ -541,6 +541,7 @@ async function convertContentUrlsToBase64(content) {
 if (savebtn) {
     savebtn.addEventListener("click", async () => {
         // Show loading indicator (optional)
+
         savebtn.disabled = true;
         try {
             const content = gatherEditorContent();
@@ -564,7 +565,6 @@ if (savebtn) {
         } finally {
             // Reset button state
             savebtn.disabled = false;
-            savebtn.textContent = "Save"; // Or whatever your original button text was
         }
     });
 }

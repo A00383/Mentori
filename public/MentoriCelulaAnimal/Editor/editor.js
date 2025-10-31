@@ -481,24 +481,91 @@ if (popupimageremove) {
     });
 }
 
+
+// Helper function to convert image URL to base64
+async function urlToBase64(url) {
+    try {
+        // If it's already a base64 string, return as is
+        if (url.startsWith('data:')) {
+            return url;
+        }
+
+        // Fetch the image from the URL
+        const response = await fetch(url);
+        const blob = await response.blob();
+
+        // Convert blob to base64
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    } catch (error) {
+        console.error('Error converting URL to base64:', error);
+        return url; // Return original URL if conversion fails
+    }
+}
+
+// Helper function to convert all URLs in content to base64
+async function convertContentUrlsToBase64(content) {
+    const convertedContent = JSON.parse(JSON.stringify(content)); // Deep copy
+
+    // Convert mainImages
+    if (convertedContent.mainImages && convertedContent.mainImages.length > 0) {
+        convertedContent.mainImages = await Promise.all(
+            convertedContent.mainImages.map(url => urlToBase64(url))
+        );
+    }
+
+    // Convert organelos images
+    if (convertedContent.organelos && convertedContent.organelos.length > 0) {
+        for (let organelo of convertedContent.organelos) {
+            if (organelo.image && organelo.image.length > 0) {
+                organelo.image = await Promise.all(
+                    organelo.image.map(url => urlToBase64(url))
+                );
+            }
+        }
+    }
+
+    return convertedContent;
+}
+
+
 // -----------------------------
 // Local save (.txt)
 // -----------------------------
 // This behavior is unchanged: we export the entire structure (including Base64 data URLs if present)
 // into a JSON file which the user can re-import.
 if (savebtn) {
-    savebtn.addEventListener("click", () => {
-        const content = gatherEditorContent();
-        const blob = new Blob([JSON.stringify(content, null, 2)], { type: "text/plain" });
-        const url = URL.createObjectURL(blob);
+    savebtn.addEventListener("click", async () => {
+        // Show loading indicator (optional)
+        savebtn.disabled = true;
+        try {
+            const content = gatherEditorContent();
 
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "datasets.txt";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+            // Convert all URLs to base64
+            const contentWithBase64 = await convertContentUrlsToBase64(content);
+
+            const blob = new Blob([JSON.stringify(contentWithBase64, null, 2)], { type: "text/plain" });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "datasets.txt";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Error saving file:', error);
+            alert('Error saving file. Please try again.');
+        } finally {
+            // Reset button state
+            savebtn.disabled = false;
+            savebtn.textContent = "Save"; // Or whatever your original button text was
+        }
     });
 }
 // -----------------------------
@@ -809,7 +876,7 @@ async function waitForOrganeles(timeout = 4000) {
 
 
 // -----------------------------
-// Save Online Button (fully fixed)
+// Save Online Button
 // -----------------------------
 if (saveonlinebutton) {
     saveonlinebutton.addEventListener("click", async () => {
